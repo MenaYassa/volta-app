@@ -1,0 +1,6 @@
+{
+  "name": "Volta",
+  "description": "Smart power strip controller and telemetry engine for MTTL-W01 devices with real-time outlet control, power analytics, schedules, and provisioning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
