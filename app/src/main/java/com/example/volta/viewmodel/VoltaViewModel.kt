@@ -8,12 +8,11 @@ import com.example.volta.model.Schedule
 import com.example.volta.model.TelemetryPoint
 import com.example.volta.model.TopConsumer
 import com.example.volta.model.VoltaSettings
+import com.example.volta.network.DiscoveredStripAp
 import com.example.volta.repository.VoltaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class VoltaViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,12 +42,36 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
     private val _topConsumers = MutableStateFlow<List<TopConsumer>>(emptyList())
     val topConsumers: StateFlow<List<TopConsumer>> = _topConsumers.asStateFlow()
 
-    // Provisioning state
+    // Provisioning & Claim state
+    val discoveredDialInIp: StateFlow<String> = repository.discoveredDialInIp
+
     private val _provisioningStatus = MutableStateFlow<String?>(null)
     val provisioningStatus: StateFlow<String?> = _provisioningStatus.asStateFlow()
 
     private val _isProvisioning = MutableStateFlow(false)
     val isProvisioning: StateFlow<Boolean> = _isProvisioning.asStateFlow()
+
+    private val _claimStatus = MutableStateFlow<String?>(null)
+    val claimStatus: StateFlow<String?> = _claimStatus.asStateFlow()
+
+    private val _isClaiming = MutableStateFlow(false)
+    val isClaiming: StateFlow<Boolean> = _isClaiming.asStateFlow()
+
+    // Wi-Fi Strip Discovery & Direct Connection state
+    private val _discoveredStrips = MutableStateFlow<List<DiscoveredStripAp>>(emptyList())
+    val discoveredStrips: StateFlow<List<DiscoveredStripAp>> = _discoveredStrips.asStateFlow()
+
+    private val _isScanningStrips = MutableStateFlow(false)
+    val isScanningStrips: StateFlow<Boolean> = _isScanningStrips.asStateFlow()
+
+    private val _isConnectingWifi = MutableStateFlow(false)
+    val isConnectingWifi: StateFlow<Boolean> = _isConnectingWifi.asStateFlow()
+
+    private val _connectedStripAp = MutableStateFlow<DiscoveredStripAp?>(null)
+    val connectedStripAp: StateFlow<DiscoveredStripAp?> = _connectedStripAp.asStateFlow()
+
+    private val _wifiConnectionStatus = MutableStateFlow<String?>(null)
+    val wifiConnectionStatus: StateFlow<String?> = _wifiConnectionStatus.asStateFlow()
 
     // Raw command state
     private val _rawCommandResponse = MutableStateFlow<String?>(null)
@@ -60,14 +83,13 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            loadAnalyticsData()
-        }
-        viewModelScope.launch {
             strips.collect { currentStrips ->
                 if (_selectedAnalyticsMac.value == null && currentStrips.isNotEmpty()) {
                     _selectedAnalyticsMac.value = currentStrips.first().mac
-                    loadAnalyticsData()
+                } else if (_selectedAnalyticsMac.value != null && currentStrips.none { it.mac == _selectedAnalyticsMac.value }) {
+                    _selectedAnalyticsMac.value = currentStrips.firstOrNull()?.mac
                 }
+                loadAnalyticsData()
             }
         }
     }
@@ -118,6 +140,7 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
     fun addStrip(mac: String, name: String, ip: String) {
         viewModelScope.launch {
             repository.addStrip(mac, name, ip)
+            loadAnalyticsData()
         }
     }
 
@@ -126,8 +149,8 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
             repository.deleteStrip(mac)
             if (_selectedAnalyticsMac.value == mac) {
                 _selectedAnalyticsMac.value = strips.value.firstOrNull()?.mac
-                loadAnalyticsData()
             }
+            loadAnalyticsData()
         }
     }
 
@@ -173,16 +196,17 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
                 "1h" -> 3600 * 1000L
                 "6h" -> 6 * 3600 * 1000L
                 "7d" -> 7 * 24 * 3600 * 1000L
-                else -> 24 * 3600 * 1000L // 24h
+                else -> 24 * 3600 * 1000L
             }
             val since = now - windowMs
             val points = repository.getTelemetry(
                 mac = _selectedAnalyticsMac.value,
                 outlet = if (_selectedAnalyticsOutlet.value == 0) null else _selectedAnalyticsOutlet.value,
-                sinceTimestamp = since
+                sinceTimestamp = since,
+                timeRange = _selectedTimeRange.value
             )
             _chartTelemetry.value = points
-            _topConsumers.value = repository.getTopConsumers(since)
+            _topConsumers.value = repository.getTopConsumers(since, _selectedTimeRange.value)
         }
     }
 
@@ -209,7 +233,21 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
         repository.clearLogs()
     }
 
-    // Provisioning
+    // Streamlined Zero-Touch Provisioning (Only SSID & Password needed!)
+    fun runProvisioning(
+        ssid: String,
+        pass: String
+    ) {
+        viewModelScope.launch {
+            _isProvisioning.value = true
+            _provisioningStatus.value = "Registering auto-claim and provisioning strip for '$ssid'..."
+            val res = repository.runProvisioning(ssid, pass)
+            _isProvisioning.value = false
+            _provisioningStatus.value = res.getOrElse { "Error: ${it.message}" }
+            loadAnalyticsData()
+        }
+    }
+
     fun runProvisioning(
         apIp: String,
         apPort: Int,
@@ -219,10 +257,23 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             _isProvisioning.value = true
-            _provisioningStatus.value = "Sending configuration to strip at $apIp:$apPort..."
+            _provisioningStatus.value = "Registering auto-claim and provisioning strip for '$ssid'..."
             val res = repository.runProvisioning(apIp, apPort, controllerIp, ssid, pass)
             _isProvisioning.value = false
             _provisioningStatus.value = res.getOrElse { "Error: ${it.message}" }
+            loadAnalyticsData()
+        }
+    }
+
+    // Claim Strip to Account
+    fun claimExistingStrip(mac: String, userToken: String, serverUrl: String) {
+        viewModelScope.launch {
+            _isClaiming.value = true
+            _claimStatus.value = "Sending claim request to $serverUrl for strip $mac..."
+            val res = repository.claimExistingStrip(mac, userToken, serverUrl)
+            _isClaiming.value = false
+            _claimStatus.value = res.getOrElse { "Error: ${it.message}" }
+            loadAnalyticsData()
         }
     }
 
@@ -232,5 +283,46 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
             repository.updateSettings(newSettings)
             loadAnalyticsData()
         }
+    }
+
+    fun sendTestNotification() {
+        repository.sendTestNotification()
+    }
+
+    // Wi-Fi Discovery & Strip AP Connection
+    fun scanForStrips() {
+        viewModelScope.launch {
+            _isScanningStrips.value = true
+            _wifiConnectionStatus.value = "Scanning for TONLY_TAP / U+TAP networks nearby…"
+            val outcome = repository.scanForStrips()
+            _discoveredStrips.value = outcome.strips
+            _isScanningStrips.value = false
+            _wifiConnectionStatus.value = if (outcome.strips.isNotEmpty()) {
+                "Found ${outcome.strips.size} strip AP(s). Tap 'Connect' to pair with LGU_<suffix> password."
+            } else {
+                outcome.infoMessage ?: "No TONLY_TAP Wi-Fi networks found in range."
+            }
+        }
+    }
+
+    fun connectToStrip(ap: DiscoveredStripAp) {
+        viewModelScope.launch {
+            _isConnectingWifi.value = true
+            _wifiConnectionStatus.value = "Connecting to ${ap.ssid} using password ${ap.password}…"
+            val res = repository.connectToStripAp(ap.ssid, ap.password)
+            _isConnectingWifi.value = false
+            if (res.isSuccess) {
+                _connectedStripAp.value = ap
+                _wifiConnectionStatus.value = "✓ Connected to ${ap.ssid}! Strip AP active at 192.168.1.1:30300. Enter server IP below and execute handshake."
+            } else {
+                _wifiConnectionStatus.value = "Connection note: ${res.exceptionOrNull()?.message}"
+            }
+        }
+    }
+
+    fun disconnectFromStripAp() {
+        repository.disconnectFromStripAp()
+        _connectedStripAp.value = null
+        _wifiConnectionStatus.value = null
     }
 }

@@ -2,7 +2,6 @@ package com.example.volta.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,12 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -41,11 +46,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volta.theme.VoltaBlue
+import com.example.volta.theme.VoltaGreen
 import com.example.volta.theme.VoltaNavy
 import com.example.volta.theme.VoltaYellow
 import com.example.volta.ui.analytics.AnalyticsScreen
@@ -58,14 +66,14 @@ import com.example.volta.ui.strips.StripsScreen
 import com.example.volta.ui.tools.ToolsScreen
 import com.example.volta.viewmodel.VoltaViewModel
 
-enum class VoltaTab(val title: String) {
-    CONTROL("Control"),
-    ANALYTICS("Analytics"),
-    STRIPS("Strips"),
-    SCHEDULES("Schedules"),
-    SETUP("Setup"),
-    TOOLS("Advanced"),
-    SETTINGS("Settings")
+enum class VoltaTab(val title: String, val icon: ImageVector) {
+    CONTROL("Control", Icons.Default.PowerSettingsNew),
+    ANALYTICS("Analytics", Icons.Default.Insights),
+    STRIPS("Strips", Icons.Default.Dns),
+    SCHEDULES("Schedules", Icons.Default.AccessTime),
+    SETUP("Setup", Icons.Default.Build),
+    TOOLS("Tools", Icons.Default.Terminal),
+    SETTINGS("Settings", Icons.Default.Tune)
 }
 
 @Composable
@@ -74,116 +82,191 @@ fun MainScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val isDarkTheme by viewModel.isDarkTheme.collectAsState()
-    val connectionStatus by viewModel.connectionStatus.collectAsState()
+    val settings by viewModel.settings.collectAsState()
     val strips by viewModel.strips.collectAsState()
 
     val onlineCount = strips.count { it.online }
+    val totalCount = strips.size
+
+    val serverSubtitle = if (settings.isStandalone) {
+        "Local Controller • Standalone"
+    } else {
+        val cleanUrl = settings.serverUrl
+            .removePrefix("http://")
+            .removePrefix("https://")
+            .trimEnd('/')
+        if (cleanUrl.isNotBlank()) "Server • $cleanUrl" else "Gateway Offline"
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            // Volta Gradient Hero Header
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(VoltaNavy, Color(0xFF1E3A8A))
-                        )
-                    )
-                    .statusBarsPadding()
+            // Streamlined, Compact Professional Header
+            Surface(
+                color = VoltaNavy,
+                shadowElevation = 4.dp
             ) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, start = 16.dp, end = 16.dp)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(VoltaNavy, Color(0xFF0F2347))
+                            )
+                        )
+                        .statusBarsPadding()
                 ) {
-                    // Top Bar with Brand, Status & Theme Toggle
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
+                        // Compact Top Title Bar (No overlap, smaller height)
                         Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            StatusDot(isOnline = onlineCount > 0)
-                            Text(
-                                text = "⚡ Volta",
-                                fontSize = 21.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Text(
-                                text = connectionStatus,
-                                fontSize = 11.sp,
-                                color = Color(0xFFCBD5E1),
-                                maxLines = 1
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "$onlineCount live",
-                                fontSize = 11.sp,
-                                color = Color(0xFFCBD5E1)
-                            )
-                            IconButton(
-                                onClick = { viewModel.toggleDarkTheme() },
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(Color.White.copy(alpha = 0.15f), CircleShape)
-                                    .testTag("theme_toggle_button")
+                            // Left Column: Brand name + Connected server under it
+                            Column(
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Icon(
-                                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = "Toggle Theme",
-                                    tint = VoltaYellow,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Tab Navigation Row
-                    ScrollableTabRow(
-                        selectedTabIndex = selectedTabIndex,
-                        containerColor = Color.Transparent,
-                        contentColor = Color.White,
-                        edgePadding = 0.dp,
-                        divider = {},
-                        indicator = { tabPositions ->
-                            if (selectedTabIndex < tabPositions.size) {
-                                TabRowDefaults.SecondaryIndicator(
-                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                                    height = 3.dp,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    ) {
-                        VoltaTab.values().forEachIndexed { index, tab ->
-                            val isSelected = selectedTabIndex == index
-                            Tab(
-                                selected = isSelected,
-                                onClick = { selectedTabIndex = index },
-                                text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     Text(
-                                        text = tab.title,
-                                        fontSize = 14.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else Color(0xFFCBD5E1)
+                                        text = "⚡",
+                                        fontSize = 17.sp
                                     )
-                                },
-                                modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
-                            )
+                                    Text(
+                                        text = "VOLTA",
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.2.sp,
+                                        color = Color.White
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                // Connected server status placed directly UNDER Volta name
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    StatusDot(
+                                        isOnline = if (settings.isStandalone) onlineCount > 0 else (onlineCount > 0 || settings.serverUrl.isNotBlank()),
+                                        modifier = Modifier.size(7.dp)
+                                    )
+                                    Text(
+                                        text = serverSubtitle,
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF94A3B8),
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            // Right Action Controls: Devices Count Pill & Settings Button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Connected devices count pill
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color.White.copy(alpha = 0.09f), RoundedCornerShape(14.dp))
+                                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(if (onlineCount > 0) VoltaGreen else Color(0xFF64748B), CircleShape)
+                                        )
+                                        Text(
+                                            text = "$onlineCount/$totalCount live",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White
+                                        )
+                                    }
+                                }
+
+                                // Quick Settings Button (Theme toggle moved inside Settings)
+                                IconButton(
+                                    onClick = { selectedTabIndex = VoltaTab.SETTINGS.ordinal },
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .background(
+                                            if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) VoltaBlue.copy(alpha = 0.25f)
+                                            else Color.White.copy(alpha = 0.09f),
+                                            CircleShape
+                                        )
+                                        .testTag("top_settings_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Settings",
+                                        tint = if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) VoltaBlue else Color(0xFFCBD5E1),
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        // Compact, Professional Navigation Tab Row
+                        ScrollableTabRow(
+                            selectedTabIndex = selectedTabIndex,
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White,
+                            edgePadding = 12.dp,
+                            divider = {},
+                            indicator = { tabPositions ->
+                                if (selectedTabIndex < tabPositions.size) {
+                                    TabRowDefaults.SecondaryIndicator(
+                                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                                        height = 2.5.dp,
+                                        color = VoltaBlue
+                                    )
+                                }
+                            },
+                            modifier = Modifier.height(42.dp)
+                        ) {
+                            VoltaTab.values().forEachIndexed { index, tab ->
+                                val isSelected = selectedTabIndex == index
+                                Tab(
+                                    selected = isSelected,
+                                    onClick = { selectedTabIndex = index },
+                                    text = {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.title,
+                                                modifier = Modifier.size(14.dp),
+                                                tint = if (isSelected) Color.White else Color(0xFF94A3B8)
+                                            )
+                                            Text(
+                                                text = tab.title,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                                            )
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
+                                )
+                            }
                         }
                     }
                 }

@@ -100,7 +100,7 @@ fun ToolsScreen(
                         )
                     }
                     Text(
-                        text = "Send direct ASCII commands to the MTTL-W01 firmware socket over port 10086.",
+                        text = "Send direct ASCII commands to the MTTL-W01 firmware socket.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

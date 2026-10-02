@@ -1,5 +1,7 @@
 package com.example.volta.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,12 +18,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -46,7 +56,7 @@ fun StatusDot(
 ) {
     Box(
         modifier = modifier
-            .size(10.dp)
+            .size(9.dp)
             .background(
                 color = if (isOnline) VoltaGreenBright else VoltaRed,
                 shape = CircleShape
@@ -76,7 +86,7 @@ fun StatBox(
         ) {
             Text(
                 text = value,
-                fontSize = 18.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = highlightColor
             )
@@ -118,22 +128,71 @@ fun InteractiveToggle(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    val trackBg = if (checked) VoltaGreen else Color(0xFFCBD5E1)
+    val trackBg by animateColorAsState(
+        targetValue = if (!enabled) Color(0xFF64748B).copy(alpha = 0.35f)
+        else if (checked) VoltaGreen
+        else Color(0xFF475569).copy(alpha = 0.45f),
+        label = "trackBg"
+    )
+    val thumbOffset by animateDpAsState(
+        targetValue = if (checked) 22.dp else 0.dp,
+        label = "thumbOffset"
+    )
+
     Box(
         modifier = modifier
-            .width(56.dp)
-            .height(32.dp)
+            .width(50.dp)
+            .height(28.dp)
             .background(trackBg, RoundedCornerShape(99.dp))
             .clickable(enabled = enabled) { onCheckedChange(!checked) }
-            .padding(4.dp),
-        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
+            .padding(3.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
         Box(
             modifier = Modifier
-                .size(24.dp)
+                .padding(start = thumbOffset)
+                .size(22.dp)
                 .background(Color.White, CircleShape)
         )
     }
+}
+
+@Composable
+fun RenameDialog(
+    title: String,
+    initialValue: String,
+    label: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(initialValue) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text(label) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (text.isNotBlank()) onConfirm(text.trim())
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -199,55 +258,65 @@ fun TelemetryLineChart(
 
                 val points = dataPoints.mapIndexed { index, value ->
                     val x = index * stepX
-                    val normalizedY = ((value - minVal) / range).toFloat()
-                    val y = height - (normalizedY * (height * 0.8f) + height * 0.1f)
+                    val normalized = ((value - minVal) / range).toFloat().coerceIn(0f, 1f)
+                    val y = height - (normalized * (height - 24f)) - 12f
                     Offset(x, y)
                 }
 
-                // Fill gradient area below the curve
-                val fillPath = Path().apply {
-                    if (points.isNotEmpty()) {
-                        moveTo(points.first().x, height)
-                        lineTo(points.first().x, points.first().y)
-                        for (i in 1 until points.size) {
-                            lineTo(points[i].x, points[i].y)
-                        }
-                        lineTo(points.last().x, height)
-                        close()
-                    }
+                // Fill gradient under curve
+                val fillPath = Path()
+                if (points.isNotEmpty()) {
+                    fillPath.moveTo(points.first().x, height)
+                    points.forEach { fillPath.lineTo(it.x, it.y) }
+                    fillPath.lineTo(points.last().x, height)
+                    fillPath.close()
+
+                    drawPath(
+                        path = fillPath,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                lineColor.copy(alpha = 0.35f),
+                                lineColor.copy(alpha = 0.0f)
+                            )
+                        )
+                    )
                 }
 
-                drawPath(
-                    path = fillPath,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(lineColor.copy(alpha = 0.35f), lineColor.copy(alpha = 0.02f)),
-                        startY = 0f,
-                        endY = height
-                    )
-                )
-
-                // Stroke line
-                val strokePath = Path().apply {
-                    if (points.isNotEmpty()) {
-                        moveTo(points.first().x, points.first().y)
-                        for (i in 1 until points.size) {
-                            lineTo(points[i].x, points[i].y)
-                        }
+                // Line path
+                val strokePath = Path()
+                if (points.isNotEmpty()) {
+                    strokePath.moveTo(points.first().x, points.first().y)
+                    for (i in 1 until points.size) {
+                        val pPrev = points[i - 1]
+                        val pCurr = points[i]
+                        val controlPoint1 = Offset(pPrev.x + (pCurr.x - pPrev.x) / 2, pPrev.y)
+                        val controlPoint2 = Offset(pPrev.x + (pCurr.x - pPrev.x) / 2, pCurr.y)
+                        strokePath.cubicTo(
+                            controlPoint1.x, controlPoint1.y,
+                            controlPoint2.x, controlPoint2.y,
+                            pCurr.x, pCurr.y
+                        )
                     }
                 }
 
                 drawPath(
                     path = strokePath,
                     color = lineColor,
-                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
                 )
 
-                // Draw latest point circle
-                if (points.isNotEmpty()) {
+                // High point dot
+                val maxPoint = points.maxByOrNull { it.y }
+                if (maxPoint != null) {
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = maxPoint
+                    )
                     drawCircle(
                         color = lineColor,
-                        radius = 4.dp.toPx(),
-                        center = points.last()
+                        radius = 2.dp.toPx(),
+                        center = maxPoint
                     )
                 }
             }

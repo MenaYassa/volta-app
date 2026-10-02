@@ -1,5 +1,10 @@
 package com.example.volta.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,14 +13,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -29,12 +41,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.volta.model.VoltaSettings
+import com.example.volta.theme.VoltaBlue
 import com.example.volta.theme.VoltaGreen
+import com.example.volta.theme.VoltaRed
+import com.example.volta.theme.VoltaYellow
+import com.example.volta.ui.components.TagBadge
 import com.example.volta.viewmodel.VoltaViewModel
 
 @Composable
@@ -42,7 +60,24 @@ fun SettingsScreen(
     viewModel: VoltaViewModel,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
+
+    var hasNotifPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
+
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            hasNotifPermission = granted
+            if (granted) viewModel.sendTestNotification()
+        }
+    )
 
     var isStandalone by remember(settings) { mutableStateOf(settings.isStandalone) }
     var serverUrl by remember(settings) { mutableStateOf(settings.serverUrl) }
@@ -62,6 +97,7 @@ fun SettingsScreen(
     var longitude by remember(settings) { mutableStateOf(settings.longitude.toString()) }
 
     var saveNotice by remember { mutableStateOf(false) }
+    val isDarkTheme by viewModel.isDarkTheme.collectAsState()
 
     LazyColumn(
         modifier = modifier
@@ -69,6 +105,74 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Theme & Appearance Card
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Appearance & Theme",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isDarkTheme) "Dark Mode (Cyberpunk Industrial)" else "Light Mode (Daylight Crisp)",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = if (isDarkTheme) Icons.Default.DarkMode else Icons.Default.LightMode,
+                            contentDescription = "Theme Icon",
+                            tint = if (isDarkTheme) VoltaYellow else VoltaBlue,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = isDarkTheme,
+                            onClick = { if (!isDarkTheme) viewModel.toggleDarkTheme() },
+                            leadingIcon = {
+                                Icon(Icons.Default.DarkMode, contentDescription = "Dark", modifier = Modifier.size(16.dp))
+                            },
+                            label = { Text("Dark Theme") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("dark_theme_chip")
+                        )
+                        FilterChip(
+                            selected = !isDarkTheme,
+                            onClick = { if (isDarkTheme) viewModel.toggleDarkTheme() },
+                            leadingIcon = {
+                                Icon(Icons.Default.LightMode, contentDescription = "Light", modifier = Modifier.size(16.dp))
+                            },
+                            label = { Text("Light Theme") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("light_theme_chip")
+                        )
+                    }
+                }
+            }
+        }
+
         // Mode & Server Connection
         item {
             Card(
@@ -231,6 +335,84 @@ fun SettingsScreen(
                         checked = notifyVoltage,
                         onCheckedChange = { notifyVoltage = it }
                     )
+                }
+            }
+        }
+
+        // Android System Notifications
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = CardDefaults.outlinedCardBorder()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Android System Notifications",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = "Notifications",
+                            tint = if (hasNotifPermission) VoltaGreen else VoltaRed
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Allows Volta to deliver instant status bar alerts when strip pairing handshakes complete or when critical voltage and temperature events occur.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Permission Status",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (hasNotifPermission) "Granted — alert channels active" else "Denied / Not yet granted",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        if (!hasNotifPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            OutlinedButton(
+                                onClick = { notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+                                modifier = Modifier.testTag("request_settings_notification_permission")
+                            ) {
+                                Text("Grant Permission")
+                            }
+                        } else {
+                            TagBadge(text = "Granted", color = VoltaGreen)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = { viewModel.sendTestNotification() },
+                        enabled = hasNotifPermission,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("send_test_notification_button")
+                    ) {
+                        Text("Send Test Notification to Phone")
+                    }
                 }
             }
         }

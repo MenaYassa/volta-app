@@ -106,6 +106,24 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
         onCreate(db)
     }
 
+    fun purgeMockData() {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            val mockMacs = arrayOf("A020A6112233", "A020A6445566")
+            for (mac in mockMacs) {
+                db.delete("outlets", "mac = ?", arrayOf(mac))
+                db.delete("schedules", "strip_mac = ?", arrayOf(mac))
+                db.delete("telemetry", "mac = ?", arrayOf(mac))
+                db.delete("strips", "mac = ?", arrayOf(mac))
+            }
+            db.execSQL("DELETE FROM telemetry WHERE mac NOT IN (SELECT mac FROM strips)")
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     fun getAllStrips(): List<PowerStrip> {
         val db = readableDatabase
         val strips = mutableListOf<PowerStrip>()

@@ -1,7 +1,8 @@
-.env
-analytics.db
-strips.json
-__pycache__/
-*.pyc
-*.log
-.DS_Store
+build/
+.gradle/
+app/build/
+*.apk
+*.aab
+local.properties
+.idea/
+*.iml

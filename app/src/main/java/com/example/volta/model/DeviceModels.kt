@@ -96,7 +96,11 @@ data class VoltaSettings(
     val notifyVoltage: Boolean = true,
     val latitude: Double = 30.0444,
     val longitude: Double = 31.2357
-)
+) {
+    val useGatewayMode: Boolean get() = !isStandalone || (serverUrl.isNotBlank() && serverToken.isNotBlank())
+    val remoteUrl: String get() = serverUrl
+    val authToken: String get() = serverToken
+}
 
 data class LogEntry(
     val id: String = java.util.UUID.randomUUID().toString(),
