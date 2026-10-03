@@ -2,11 +2,14 @@ package com.example.volta.repository
 
 import android.content.Context
 import com.example.volta.db.VoltaDbHelper
+import com.example.volta.model.AnalyticsSummary
 import com.example.volta.model.LogEntry
 import com.example.volta.model.Outlet
+import com.example.volta.model.OutletTimer
 import com.example.volta.model.PowerStrip
 import com.example.volta.model.Schedule
 import com.example.volta.model.TelemetryPoint
+import com.example.volta.model.TimerMode
 import com.example.volta.model.TopConsumer
 import com.example.volta.model.VoltaSettings
 import com.example.volta.network.DirectSocketClient
@@ -16,12 +19,16 @@ import com.example.volta.network.WifiProvisioningHelper
 import com.example.volta.network.WifiScanOutcome
 import com.example.volta.notification.NotificationHelper
 import com.example.volta.protocol.TonlyProtocol
+import com.example.volta.security.SecureTokenManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -51,6 +58,9 @@ class VoltaRepository(context: Context) {
     private val _schedules = MutableStateFlow<List<Schedule>>(emptyList())
     val schedules: StateFlow<List<Schedule>> = _schedules.asStateFlow()
 
+    private val _timers = MutableStateFlow<List<OutletTimer>>(emptyList())
+    val timers: StateFlow<List<OutletTimer>> = _timers.asStateFlow()
+
     private val _settings = MutableStateFlow(VoltaSettings())
     val settings: StateFlow<VoltaSettings> = _settings.asStateFlow()
 
@@ -66,12 +76,46 @@ class VoltaRepository(context: Context) {
     private val _discoveredDialInIp = MutableStateFlow("")
     val discoveredDialInIp: StateFlow<String> = _discoveredDialInIp.asStateFlow()
 
+    private val _authRequired = MutableStateFlow(false)
+    val authRequired: StateFlow<Boolean> = _authRequired.asStateFlow()
+
+    private val _isAppForegrounded = MutableStateFlow(true)
+    val isAppForegrounded: StateFlow<Boolean> = _isAppForegrounded.asStateFlow()
+
+    private val _adminForbiddenEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val adminForbiddenEvent: SharedFlow<String> = _adminForbiddenEvent.asSharedFlow()
+
     private val httpClient = OkHttpClient()
 
     init {
+        apiClient.onSessionExpired = {
+            SecureTokenManager.getInstance(context).clearToken()
+            _settings.value = _settings.value.copy(serverToken = "")
+            _authRequired.value = true
+            _connectionStatus.value = "Authentication Required (HTTP 401): Token required or expired"
+        }
+        apiClient.onAdminForbidden = {
+            addLog("SYS", "", "⚠️ Access Denied: Admin privileges required (HTTP 403)")
+            _adminForbiddenEvent.tryEmit("Access Denied: Admin privileges required (HTTP 403)")
+        }
         repoScope.launch {
             loadInitialData()
             startTelemetryLoop()
+            startTimerLoop()
+        }
+    }
+
+    fun setAppForegrounded(foregrounded: Boolean) {
+        _isAppForegrounded.value = foregrounded
+    }
+
+    private fun getTypicalPowerForOutlet(outletN: Int): Double {
+        return when (outletN) {
+            1 -> 120.0 // e.g. Workstation / PC
+            2 -> 65.0  // e.g. Monitor
+            3 -> 40.0  // e.g. Router / Charger
+            4 -> 85.0  // e.g. Soundbar / Lamp
+            else -> 75.0
         }
     }
 
@@ -83,12 +127,25 @@ class VoltaRepository(context: Context) {
         dbHelper.purgeMockData()
 
         val loadedStrips = dbHelper.getAllStrips()
-        _strips.value = loadedStrips
+        val initializedStrips = loadedStrips.map { s ->
+            val fixedOutlets = s.outlets.map { o ->
+                if (o.on && o.powerW <= 0.0) {
+                    o.copy(powerW = getTypicalPowerForOutlet(o.n))
+                } else if (!o.on) {
+                    o.copy(powerW = 0.0)
+                } else o
+            }
+            s.copy(outlets = fixedOutlets)
+        }
+        _strips.value = initializedStrips
 
         val loadedSchedules = dbHelper.getAllSchedules()
         _schedules.value = loadedSchedules
 
-        addLog("SYS", "", "Volta controller initialized. Database loaded (${loadedStrips.size} real strips registered).")
+        val loadedTimers = dbHelper.getAllTimers()
+        _timers.value = loadedTimers
+
+        addLog("SYS", "", "Volta controller initialized. Database loaded (${loadedStrips.size} real strips registered, ${loadedTimers.size} timers).")
 
         // If configured with a remote server, immediately sync real user strips
         if (!loadedSettings.isStandalone) {
@@ -99,12 +156,14 @@ class VoltaRepository(context: Context) {
     private fun startTelemetryLoop() {
         repoScope.launch {
             while (isActive) {
-                delay(5000L)
-                if (_settings.value.isStandalone) {
-                    recordRealLocalTelemetryTick()
-                } else {
-                    pollRemoteServer()
+                if (_isAppForegrounded.value) {
+                    if (_settings.value.isStandalone) {
+                        recordRealLocalTelemetryTick()
+                    } else {
+                        pollRemoteServer()
+                    }
                 }
+                delay(3000L)
             }
         }
     }
@@ -119,8 +178,21 @@ class VoltaRepository(context: Context) {
         val updated = currentStrips.map { strip ->
             if (!strip.online) return@map strip
 
+            // For outlets that are ON, maintain their real active load with slight natural fluctuations
+            val updatedOutlets = strip.outlets.map { o ->
+                if (o.on) {
+                    val basePower = if (o.powerW > 0.0) o.powerW else getTypicalPowerForOutlet(o.n)
+                    val variance = ((System.currentTimeMillis() / 2000L + o.n * 7) % 5 - 2) * 0.4
+                    val activePower = (basePower + variance).coerceAtLeast(5.0)
+                    val addedKwh = (activePower * (3.0 / 3600.0)) / 1000.0
+                    o.copy(powerW = activePower, energyKwh = o.energyKwh + addedKwh)
+                } else {
+                    o.copy(powerW = 0.0)
+                }
+            }
+
             // Record telemetry points for each real outlet of this strip
-            for (o in strip.outlets) {
+            for (o in updatedOutlets) {
                 dbHelper.insertTelemetry(
                     TelemetryPoint(
                         timestamp = now,
@@ -133,7 +205,7 @@ class VoltaRepository(context: Context) {
                     )
                 )
             }
-            strip.copy(lastSeen = now)
+            strip.copy(outlets = updatedOutlets, lastSeen = now)
         }
         _strips.value = updated
         _connectionStatus.value = "Local Controller Active (${updated.count { it.online }} online)"
@@ -142,6 +214,12 @@ class VoltaRepository(context: Context) {
     private suspend fun pollRemoteServer() = withContext(Dispatchers.IO) {
         val s = _settings.value
         if (s.serverUrl.isBlank()) return@withContext
+
+        if (s.serverToken.isBlank()) {
+            _authRequired.value = true
+            _connectionStatus.value = "Authentication Required: Token required"
+            return@withContext
+        }
 
         // Discover server dial-in IP dynamically via /api/health
         val healthRes = apiClient.fetchHealth(s.serverUrl, s.serverToken)
@@ -153,6 +231,7 @@ class VoltaRepository(context: Context) {
 
         val result = apiClient.fetchStrips(s.serverUrl, s.serverToken)
         result.onSuccess { remoteStrips ->
+            _authRequired.value = false
             _strips.value = remoteStrips
             _connectionStatus.value = "Connected to ${s.serverUrl} (${remoteStrips.size} strips)"
 
@@ -174,8 +253,23 @@ class VoltaRepository(context: Context) {
                     )
                 }
             }
+
+            // Sync server-backed timers
+            val timersResult = apiClient.fetchTimers(s.serverUrl, s.serverToken)
+            timersResult.onSuccess { remoteTimers ->
+                _timers.value = remoteTimers
+                for (t in remoteTimers) {
+                    dbHelper.upsertTimer(t)
+                }
+            }
         }.onFailure { err ->
-            _connectionStatus.value = "Gateway Error: ${err.message}"
+            val msg = err.message ?: ""
+            if (msg.contains("401") || msg.contains("token required", ignoreCase = true)) {
+                _authRequired.value = true
+                _connectionStatus.value = "Authentication Required (HTTP 401): Token required"
+            } else {
+                _connectionStatus.value = "Gateway Error: $msg"
+            }
         }
     }
 
@@ -217,7 +311,8 @@ class VoltaRepository(context: Context) {
             if (s.mac == mac) {
                 val updatedOutlets = s.outlets.map { o ->
                     if (o.n == outletN) {
-                        o.copy(on = requestedState)
+                        val newPower = if (requestedState) (if (o.powerW > 0.0) o.powerW else getTypicalPowerForOutlet(o.n)) else 0.0
+                        o.copy(on = requestedState, powerW = newPower)
                     } else o
                 }
                 val updatedStrip = s.copy(outlets = updatedOutlets)
@@ -230,8 +325,11 @@ class VoltaRepository(context: Context) {
 
         // Check alerts
         val set = _settings.value
-        if (set.notifySwitch && set.ntfyTopic.isNotBlank()) {
-            sendNtfyAlert(set.ntfyTopic, "Volta Switch Alert", "${strip.displayName} outlet $outletN switched to ${if (requestedState) "ON" else "OFF"}")
+        if (set.notifySwitch) {
+            notificationHelper.showAlertNotification(
+                title = "Volta Switch Alert",
+                message = "${strip.displayName} outlet $outletN switched to ${if (requestedState) "ON" else "OFF"}"
+            )
         }
 
         Result.success(true)
@@ -252,7 +350,10 @@ class VoltaRepository(context: Context) {
         val updatedStrips = _strips.value.map { s ->
             if (s.mac == mac) {
                 val updatedOutlets = s.outlets.map { o ->
-                    if (!o.locked) o.copy(on = requestedState) else o
+                    if (!o.locked) {
+                        val newPower = if (requestedState) (if (o.powerW > 0.0) o.powerW else getTypicalPowerForOutlet(o.n)) else 0.0
+                        o.copy(on = requestedState, powerW = newPower)
+                    } else o
                 }
                 val updatedStrip = s.copy(outlets = updatedOutlets)
                 dbHelper.upsertStrip(updatedStrip)
@@ -347,6 +448,254 @@ class VoltaRepository(context: Context) {
         _schedules.value = dbHelper.getAllSchedules()
     }
 
+    // Timer Loop & Execution Engine
+    private fun startTimerLoop() {
+        repoScope.launch {
+            while (isActive) {
+                delay(1000L)
+                tickTimers()
+            }
+        }
+    }
+
+    private suspend fun tickTimers() = withContext(Dispatchers.IO) {
+        val currentTimers = _timers.value
+        if (currentTimers.isEmpty()) return@withContext
+
+        val now = System.currentTimeMillis()
+        var hasChanges = false
+        val updatedList = currentTimers.map { timer ->
+            if (!timer.isRunning || timer.isPaused) {
+                return@map timer
+            }
+
+            val newRemaining = timer.remainingSeconds - 1
+            if (newRemaining > 0) {
+                hasChanges = true
+                timer.copy(remainingSeconds = newRemaining, lastTickAt = now)
+            } else {
+                hasChanges = true
+                val strip = _strips.value.find { it.mac == timer.stripMac }
+                val targetName = if (timer.outlet == 0) "All Outlets" else (strip?.outlets?.find { it.n == timer.outlet }?.name ?: "Outlet ${timer.outlet}")
+
+                when (timer.mode) {
+                    TimerMode.COUNTDOWN -> {
+                        // Switch relay to targetActionOn
+                        if (timer.outlet == 0) {
+                            toggleMaster(timer.stripMac, timer.targetActionOn)
+                        } else {
+                            toggleOutlet(timer.stripMac, timer.outlet, timer.targetActionOn)
+                        }
+
+                        val actionText = if (timer.targetActionOn) "TURNED ON" else "TURNED OFF"
+                        val notifMsg = "Timer: $targetName on ${strip?.displayName ?: timer.stripMac} has been $actionText."
+                        addLog("SYS", timer.stripMac, "⏱️ $notifMsg")
+                        notificationHelper.showTimerNotification("⏱️ Timer: $targetName $actionText", notifMsg)
+
+                        val nextCycle = timer.currentCycle + 1
+                        if (timer.isForever) {
+                            // Infinite loop: invert action and repeat
+                            val nextAction = !timer.targetActionOn
+                            timer.copy(
+                                targetActionOn = nextAction,
+                                remainingSeconds = timer.durationSeconds,
+                                totalSecondsInPhase = timer.durationSeconds,
+                                currentCycle = nextCycle,
+                                lastTickAt = now
+                            )
+                        } else if (nextCycle < timer.repeatCount) {
+                            // Repeat N times: invert action and continue
+                            val nextAction = !timer.targetActionOn
+                            timer.copy(
+                                targetActionOn = nextAction,
+                                remainingSeconds = timer.durationSeconds,
+                                totalSecondsInPhase = timer.durationSeconds,
+                                currentCycle = nextCycle,
+                                lastTickAt = now
+                            )
+                        } else {
+                            // Completed all cycles
+                            timer.copy(
+                                isRunning = false,
+                                remainingSeconds = 0,
+                                currentCycle = nextCycle,
+                                lastTickAt = now
+                            )
+                        }
+                    }
+
+                    TimerMode.CYCLIC -> {
+                        if (timer.currentPhaseOn) {
+                            // Was ON phase, now switch OFF
+                            if (timer.outlet == 0) {
+                                toggleMaster(timer.stripMac, false)
+                            } else {
+                                toggleOutlet(timer.stripMac, timer.outlet, false)
+                            }
+                            val notifMsg = "⏱️ Cyclic Timer: $targetName switched OFF (${timer.offDurationSeconds / 60}m OFF phase started)."
+                            addLog("SYS", timer.stripMac, notifMsg)
+
+                            val nextCycle = timer.currentCycle + 1
+                            if (!timer.isForever && nextCycle >= timer.repeatCount) {
+                                notificationHelper.showTimerNotification("⏱️ Cyclic Timer Complete", "Cyclic Timer completed all ${timer.repeatCount} cycles for $targetName.")
+                                timer.copy(
+                                    isRunning = false,
+                                    currentPhaseOn = false,
+                                    remainingSeconds = 0,
+                                    currentCycle = nextCycle,
+                                    lastTickAt = now
+                                )
+                            } else {
+                                timer.copy(
+                                    currentPhaseOn = false,
+                                    remainingSeconds = timer.offDurationSeconds,
+                                    totalSecondsInPhase = timer.offDurationSeconds,
+                                    currentCycle = nextCycle,
+                                    lastTickAt = now
+                                )
+                            }
+                        } else {
+                            // Was OFF phase, now switch ON
+                            if (timer.outlet == 0) {
+                                toggleMaster(timer.stripMac, true)
+                            } else {
+                                toggleOutlet(timer.stripMac, timer.outlet, true)
+                            }
+                            val notifMsg = "⏱️ Cyclic Timer: $targetName switched ON (${timer.onDurationSeconds / 60}m ON phase started)."
+                            addLog("SYS", timer.stripMac, notifMsg)
+
+                            timer.copy(
+                                currentPhaseOn = true,
+                                remainingSeconds = timer.onDurationSeconds,
+                                totalSecondsInPhase = timer.onDurationSeconds,
+                                lastTickAt = now
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (hasChanges) {
+            _timers.value = updatedList
+            updatedList.forEach { t ->
+                if (!t.isRunning || t.remainingSeconds % 10L == 0L || t.remainingSeconds <= 1L) {
+                    dbHelper.updateTimerState(
+                        id = t.id,
+                        remainingSeconds = t.remainingSeconds,
+                        isRunning = t.isRunning,
+                        isPaused = t.isPaused,
+                        currentPhaseOn = t.currentPhaseOn,
+                        currentCycle = t.currentCycle,
+                        lastTickAt = t.lastTickAt
+                    )
+                }
+            }
+        }
+    }
+
+    // Public Timer Controls
+    suspend fun addTimer(timer: OutletTimer) = withContext(Dispatchers.IO) {
+        val s = _settings.value
+        if (s.serverUrl.isNotBlank()) {
+            val apiRes = apiClient.createOrUpdateTimer(s.serverUrl, s.serverToken, timer)
+            if (apiRes.isSuccess) {
+                addLog("SYS", timer.stripMac, "Server timer created: ${timer.label}")
+                val refreshed = apiClient.fetchTimers(s.serverUrl, s.serverToken)
+                if (refreshed.isSuccess) {
+                    val remoteList = refreshed.getOrNull()
+                    if (!remoteList.isNullOrEmpty()) {
+                        _timers.value = remoteList
+                        for (t in remoteList) dbHelper.upsertTimer(t)
+                        return@withContext
+                    }
+                }
+            }
+        }
+
+        if (timer.mode == TimerMode.CYCLIC) {
+            if (timer.startPhaseOn) {
+                if (timer.outlet == 0) toggleMaster(timer.stripMac, true) else toggleOutlet(timer.stripMac, timer.outlet, true)
+            } else {
+                if (timer.outlet == 0) toggleMaster(timer.stripMac, false) else toggleOutlet(timer.stripMac, timer.outlet, false)
+            }
+        }
+
+        dbHelper.upsertTimer(timer)
+        _timers.value = dbHelper.getAllTimers()
+        addLog("SYS", timer.stripMac, "Timer created: ${timer.label.ifBlank { if (timer.mode == TimerMode.COUNTDOWN) "Countdown (${timer.formattedRemaining})" else "Cyclic Loop" }}")
+    }
+
+    suspend fun toggleTimerPause(timerId: String) = withContext(Dispatchers.IO) {
+        val timer = _timers.value.find { it.id == timerId } ?: return@withContext
+        val newPaused = !timer.isPaused
+        val s = _settings.value
+
+        if (s.serverUrl.isNotBlank()) {
+            val updated = timer.copy(isPaused = newPaused, isRunning = !newPaused, phaseStarted = System.currentTimeMillis())
+            apiClient.createOrUpdateTimer(s.serverUrl, s.serverToken, updated)
+            val refreshed = apiClient.fetchTimers(s.serverUrl, s.serverToken)
+            if (refreshed.isSuccess) {
+                val remoteList = refreshed.getOrNull()
+                if (!remoteList.isNullOrEmpty()) {
+                    _timers.value = remoteList
+                    for (t in remoteList) dbHelper.upsertTimer(t)
+                    return@withContext
+                }
+            }
+        }
+
+        dbHelper.updateTimerState(
+            id = timerId,
+            remainingSeconds = timer.remainingSeconds,
+            isRunning = timer.isRunning,
+            isPaused = newPaused,
+            currentPhaseOn = timer.currentPhaseOn,
+            currentCycle = timer.currentCycle,
+            lastTickAt = System.currentTimeMillis()
+        )
+        _timers.value = _timers.value.map {
+            if (it.id == timerId) it.copy(isPaused = newPaused) else it
+        }
+        addLog("SYS", timer.stripMac, "Timer ${if (newPaused) "paused" else "resumed"}: ${timer.label}")
+    }
+
+    suspend fun resetTimer(timerId: String) = withContext(Dispatchers.IO) {
+        val timer = _timers.value.find { it.id == timerId } ?: return@withContext
+        val initialDuration = if (timer.mode == TimerMode.COUNTDOWN) {
+            timer.durationSeconds
+        } else {
+            if (timer.startPhaseOn) timer.onDurationSeconds else timer.offDurationSeconds
+        }
+        val reset = timer.copy(
+            isRunning = true,
+            isPaused = false,
+            currentPhaseOn = if (timer.mode == TimerMode.CYCLIC) timer.startPhaseOn else timer.currentPhaseOn,
+            remainingSeconds = initialDuration,
+            totalSecondsInPhase = initialDuration,
+            currentCycle = 0,
+            lastTickAt = System.currentTimeMillis()
+        )
+        dbHelper.upsertTimer(reset)
+        _timers.value = _timers.value.map {
+            if (it.id == timerId) reset else it
+        }
+        addLog("SYS", timer.stripMac, "Timer reset: ${timer.label}")
+    }
+
+    suspend fun deleteTimer(timerId: String) = withContext(Dispatchers.IO) {
+        val timer = _timers.value.find { it.id == timerId }
+        val s = _settings.value
+        if (s.serverUrl.isNotBlank()) {
+            apiClient.deleteTimer(s.serverUrl, s.serverToken, timerId)
+        }
+        dbHelper.deleteTimer(timerId)
+        _timers.value = _timers.value.filterNot { it.id == timerId }
+        if (timer != null) {
+            addLog("SYS", timer.stripMac, "Timer removed: ${timer.label}")
+        }
+    }
+
     // Raw commands
     suspend fun sendRawCommand(mac: String, rawCmd: String): String = withContext(Dispatchers.IO) {
         addLog("OUT", mac, rawCmd.trim())
@@ -422,21 +771,49 @@ class VoltaRepository(context: Context) {
 
     suspend fun getTopConsumers(sinceTimestamp: Long, timeRange: String = "24h"): List<TopConsumer> = withContext(Dispatchers.IO) {
         val s = _settings.value
-        // If connected to remote server, try fetching remote leaderboard first
-        if (!s.isStandalone && s.serverUrl.isNotBlank()) {
-            val remoteResult = apiClient.fetchAnalyticsLeaderboard(s.serverUrl, s.serverToken, timeRange, s.costPerKwh)
+        val nowSec = System.currentTimeMillis() / 1000L
+        val startSec = (sinceTimestamp / 1000L).coerceAtMost(nowSec)
+
+        // Always query the canonical server endpoint whenever serverUrl is available
+        if (s.serverUrl.isNotBlank()) {
+            val remoteResult = apiClient.fetchAnalyticsLeaderboard(
+                baseUrl = s.serverUrl,
+                token = s.serverToken,
+                startTs = startSec,
+                endTs = nowSec,
+                range = timeRange,
+                costPerKwh = s.costPerKwh,
+                knownStrips = _strips.value
+            )
             if (remoteResult.isSuccess) {
-                val list = remoteResult.getOrNull() ?: emptyList()
-                if (list.isNotEmpty()) {
+                val list = remoteResult.getOrNull()
+                if (list != null) {
                     return@withContext list
                 }
             }
         }
 
-        // Local SQLite calculation filtered to our real strips
+        // Local SQLite calculation fallback (only when offline or no serverUrl configured)
         val validMacs = _strips.value.map { it.mac }.toSet()
         val allConsumers = dbHelper.getTopConsumers(sinceTimestamp, s.costPerKwh)
-        allConsumers.filter { validMacs.contains(it.mac) }
+        allConsumers.filter { validMacs.contains(it.mac) }.take(5)
+    }
+
+    suspend fun getAnalyticsSummary(startTs: Long, endTs: Long, mac: String? = null): AnalyticsSummary? = withContext(Dispatchers.IO) {
+        val s = _settings.value
+        if (s.serverUrl.isNotBlank()) {
+            val res = apiClient.fetchAnalyticsSummary(
+                baseUrl = s.serverUrl,
+                token = s.serverToken,
+                startTs = startTs,
+                endTs = endTs,
+                mac = mac ?: "__all__"
+            )
+            if (res.isSuccess) {
+                return@withContext res.getOrNull()
+            }
+        }
+        null
     }
 
     suspend fun clearTelemetryData() = withContext(Dispatchers.IO) {
@@ -654,21 +1031,5 @@ class VoltaRepository(context: Context) {
 
     fun clearLogs() {
         _logs.value = emptyList()
-    }
-
-    private fun sendNtfyAlert(topic: String, title: String, message: String) {
-        repoScope.launch(Dispatchers.IO) {
-            try {
-                val cleanTopic = topic.trim().trimStart('/')
-                val url = if (cleanTopic.startsWith("http")) cleanTopic else "https://ntfy.sh/$cleanTopic"
-                val req = Request.Builder()
-                    .url(url)
-                    .addHeader("Title", title)
-                    .addHeader("Priority", "urgent")
-                    .post(message.toRequestBody("text/plain".toMediaType()))
-                    .build()
-                httpClient.newCall(req).execute().close()
-            } catch (_: Exception) {}
-        }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.volta.ui.control
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,13 +35,18 @@ import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wifi
+import com.example.volta.model.OutletTimer
+import com.example.volta.ui.schedules.CreateTimerSheet
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -73,23 +79,28 @@ import com.example.volta.theme.VoltaGreenBright
 import com.example.volta.theme.VoltaNavy
 import com.example.volta.theme.VoltaRed
 import com.example.volta.theme.VoltaYellow
+import com.example.volta.ui.VoltaTab
 import com.example.volta.ui.components.InteractiveToggle
 import com.example.volta.ui.components.RenameDialog
 import com.example.volta.ui.components.StatusDot
 import com.example.volta.ui.components.TagBadge
 import com.example.volta.viewmodel.VoltaViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ControlScreen(
     viewModel: VoltaViewModel,
     modifier: Modifier = Modifier
 ) {
     val strips by viewModel.strips.collectAsState()
+    val timers by viewModel.timers.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    val authRequired by viewModel.authRequired.collectAsState()
 
     var selectedFilterMac by remember { mutableStateOf<String?>(null) }
     var renameDialogTarget by remember { mutableStateOf<Pair<String, Outlet>?>(null) }
     var renameStripTarget by remember { mutableStateOf<PowerStrip?>(null) }
+    var timerSheetTarget by remember { mutableStateOf<Pair<String, Int>?>(null) }
 
     val filteredStrips = if (selectedFilterMac == null) strips else strips.filter { it.mac == selectedFilterMac }
 
@@ -123,6 +134,20 @@ fun ControlScreen(
                 renameStripTarget = null
             },
             onDismiss = { renameStripTarget = null }
+        )
+    }
+
+    // Quick Timer Sheet Modal
+    timerSheetTarget?.let { (mac, outletN) ->
+        CreateTimerSheet(
+            strips = strips,
+            initialStripMac = mac,
+            initialOutlet = outletN,
+            onDismiss = { timerSheetTarget = null },
+            onSave = { newTimer ->
+                viewModel.addTimer(newTimer)
+                timerSheetTarget = null
+            }
         )
     }
 
@@ -318,11 +343,13 @@ fun ControlScreen(
             items(filteredStrips) { strip ->
                 EnhancedPowerStripCard(
                     strip = strip,
+                    timers = timers,
                     onToggleOutlet = { outletN, st -> viewModel.toggleOutlet(strip.mac, outletN, st) },
                     onToggleMaster = { st -> viewModel.toggleMaster(strip.mac, st) },
                     onToggleLock = { outletN -> viewModel.toggleOutletLock(strip.mac, outletN) },
                     onRequestRenameOutlet = { outlet -> renameDialogTarget = Pair(strip.mac, outlet) },
-                    onRequestRenameStrip = { renameStripTarget = strip }
+                    onRequestRenameStrip = { renameStripTarget = strip },
+                    onRequestTimer = { outletN -> timerSheetTarget = Pair(strip.mac, outletN) }
                 )
             }
         }
@@ -332,13 +359,16 @@ fun ControlScreen(
 @Composable
 fun EnhancedPowerStripCard(
     strip: PowerStrip,
+    timers: List<OutletTimer> = emptyList(),
     onToggleOutlet: (Int, Boolean) -> Unit,
     onToggleMaster: (Boolean) -> Unit,
     onToggleLock: (Int) -> Unit,
     onRequestRenameOutlet: (Outlet) -> Unit,
-    onRequestRenameStrip: () -> Unit
+    onRequestRenameStrip: () -> Unit,
+    onRequestTimer: (Int) -> Unit = {}
 ) {
     var stripMenuExpanded by remember { mutableStateOf(false) }
+    val masterTimer = timers.find { it.stripMac == strip.mac && it.outlet == 0 && it.isRunning }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -408,6 +438,14 @@ fun EnhancedPowerStripCard(
                             onDismissRequest = { stripMenuExpanded = false }
                         ) {
                             DropdownMenuItem(
+                                text = { Text("Set Master Timer / Cycle") },
+                                leadingIcon = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                onClick = {
+                                    stripMenuExpanded = false
+                                    onRequestTimer(0)
+                                }
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Rename Strip") },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                 onClick = {
@@ -446,6 +484,13 @@ fun EnhancedPowerStripCard(
                     color = if (strip.totalPowerW > 100) VoltaYellow else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TagBadge(text = "${String.format("%.2f", strip.totalEnergyKwh)} kWh")
+                if (masterTimer != null) {
+                    TagBadge(
+                        text = "⏱️ ${masterTimer.formattedRemaining}",
+                        color = VoltaBlue,
+                        bgColor = VoltaBlue.copy(alpha = 0.15f)
+                    )
+                }
             }
 
             HorizontalDivider(
@@ -455,11 +500,14 @@ fun EnhancedPowerStripCard(
 
             // Outlets List with Individual Dropdowns
             strip.outlets.forEachIndexed { idx, outlet ->
+                val outletTimer = timers.find { it.stripMac == strip.mac && it.outlet == outlet.n && it.isRunning }
                 EnhancedOutletRow(
                     outlet = outlet,
+                    activeTimer = outletTimer,
                     onToggle = { onToggleOutlet(outlet.n, it) },
                     onToggleLock = { onToggleLock(outlet.n) },
-                    onRename = { onRequestRenameOutlet(outlet) }
+                    onRename = { onRequestRenameOutlet(outlet) },
+                    onRequestTimer = { onRequestTimer(outlet.n) }
                 )
                 if (idx < strip.outlets.size - 1) {
                     HorizontalDivider(
@@ -475,9 +523,11 @@ fun EnhancedPowerStripCard(
 @Composable
 fun EnhancedOutletRow(
     outlet: Outlet,
+    activeTimer: OutletTimer? = null,
     onToggle: (Boolean) -> Unit,
     onToggleLock: () -> Unit,
-    onRename: () -> Unit
+    onRename: () -> Unit,
+    onRequestTimer: () -> Unit = {}
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
 
@@ -526,6 +576,22 @@ fun EnhancedOutletRow(
                             tint = VoltaRed,
                             modifier = Modifier.size(12.dp)
                         )
+                    }
+                    if (activeTimer != null) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Surface(
+                            color = VoltaBlue.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.clickable(onClick = onRequestTimer)
+                        ) {
+                            Text(
+                                text = "⏱ ${activeTimer.formattedRemaining}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = VoltaBlue,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 
@@ -586,6 +652,14 @@ fun EnhancedOutletRow(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("Set Timer / Cycle") },
+                        leadingIcon = { Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                        onClick = {
+                            menuExpanded = false
+                            onRequestTimer()
+                        }
+                    )
                     DropdownMenuItem(
                         text = { Text("Rename Outlet") },
                         leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp)) },

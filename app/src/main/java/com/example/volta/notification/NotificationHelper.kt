@@ -19,8 +19,10 @@ class NotificationHelper(private val context: Context) {
     companion object {
         const val CHANNEL_ALERTS_ID = "volta_alerts_channel"
         const val CHANNEL_HANDSHAKE_ID = "volta_handshake_channel"
+        const val CHANNEL_TIMERS_ID = "volta_timers_channel"
         const val HANDSHAKE_NOTIFICATION_ID = 2001
         const val ALERT_NOTIFICATION_ID = 3001
+        const val TIMER_NOTIFICATION_ID = 4001
     }
 
     init {
@@ -47,9 +49,19 @@ class NotificationHelper(private val context: Context) {
                 enableVibration(true)
             }
 
+            val timersChannel = NotificationChannel(
+                CHANNEL_TIMERS_ID,
+                "Volta Timers & Automations",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Notifications when timers or automation schedules switch outlets"
+                enableVibration(true)
+            }
+
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(alertsChannel)
             manager.createNotificationChannel(handshakeChannel)
+            manager.createNotificationChannel(timersChannel)
         }
     }
 
@@ -109,6 +121,33 @@ class NotificationHelper(private val context: Context) {
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ALERTS_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+        } catch (_: SecurityException) {}
+    }
+
+    fun showTimerNotification(title: String, message: String, notificationId: Int = (System.currentTimeMillis() % 10000).toInt() + 4000) {
+        if (!hasNotificationPermission()) return
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_TIMERS_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(message)

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
@@ -55,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import com.example.volta.theme.VoltaBlue
 import com.example.volta.theme.VoltaGreen
 import com.example.volta.theme.VoltaNavy
+import com.example.volta.theme.VoltaRed
 import com.example.volta.theme.VoltaYellow
 import com.example.volta.ui.analytics.AnalyticsScreen
 import com.example.volta.ui.components.StatusDot
@@ -81,7 +83,8 @@ fun MainScreen(
     viewModel: VoltaViewModel,
     modifier: Modifier = Modifier
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val selectedTabIndex by viewModel.selectedTab.collectAsState()
+    val authRequired by viewModel.authRequired.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val strips by viewModel.strips.collectAsState()
 
@@ -202,7 +205,7 @@ fun MainScreen(
 
                                 // Quick Settings Button (Theme toggle moved inside Settings)
                                 IconButton(
-                                    onClick = { selectedTabIndex = VoltaTab.SETTINGS.ordinal },
+                                    onClick = { viewModel.setSelectedTab(VoltaTab.SETTINGS.ordinal) },
                                     modifier = Modifier
                                         .size(34.dp)
                                         .background(
@@ -244,7 +247,7 @@ fun MainScreen(
                                 val isSelected = selectedTabIndex == index
                                 Tab(
                                     selected = isSelected,
-                                    onClick = { selectedTabIndex = index },
+                                    onClick = { viewModel.setSelectedTab(index) },
                                     text = {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
@@ -266,6 +269,56 @@ fun MainScreen(
                                     },
                                     modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
                                 )
+                            }
+                        }
+
+                        // Security Auth Banner if Token Missing or 401 Unauthorized
+                        if (authRequired) {
+                            Surface(
+                                color = VoltaRed,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { viewModel.navigateToTokenConfiguration() }
+                                    .testTag("auth_required_banner")
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Lock,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Token required: Server requires authentication.",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    Surface(
+                                        color = Color.White,
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "Configure Token",
+                                            color = VoltaRed,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

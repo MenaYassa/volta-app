@@ -3,15 +3,23 @@ package com.example.volta.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.volta.model.AnalyticsSummary
+import com.example.volta.model.OutletTimer
 import com.example.volta.model.PowerStrip
 import com.example.volta.model.Schedule
 import com.example.volta.model.TelemetryPoint
+import com.example.volta.model.TimerMode
 import com.example.volta.model.TopConsumer
 import com.example.volta.model.VoltaSettings
 import com.example.volta.network.DiscoveredStripAp
 import com.example.volta.repository.VoltaRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
@@ -21,6 +29,7 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
 
     val strips: StateFlow<List<PowerStrip>> = repository.strips
     val schedules: StateFlow<List<Schedule>> = repository.schedules
+    val timers: StateFlow<List<OutletTimer>> = repository.timers
     val settings: StateFlow<VoltaSettings> = repository.settings
     val logs = repository.logs
     val isRefreshing = repository.isRefreshing
@@ -41,6 +50,13 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _topConsumers = MutableStateFlow<List<TopConsumer>>(emptyList())
     val topConsumers: StateFlow<List<TopConsumer>> = _topConsumers.asStateFlow()
+
+    private val _topConsumersTimeRange = MutableStateFlow("7d")
+    val topConsumersTimeRange: StateFlow<String> = _topConsumersTimeRange.asStateFlow()
+
+    private var summaryJob: Job? = null
+    private val _analyticsSummary = MutableStateFlow<AnalyticsSummary?>(null)
+    val analyticsSummary: StateFlow<AnalyticsSummary?> = _analyticsSummary.asStateFlow()
 
     // Provisioning & Claim state
     val discoveredDialInIp: StateFlow<String> = repository.discoveredDialInIp
@@ -81,15 +97,42 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
     private val _isDarkTheme = MutableStateFlow(true)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
+    // Auth status & active navigation tab
+    val authRequired: StateFlow<Boolean> = repository.authRequired
+    val adminForbiddenEvent = repository.adminForbiddenEvent
+
+    fun setAppForegrounded(foregrounded: Boolean) {
+        repository.setAppForegrounded(foregrounded)
+    }
+
+    private val _selectedTab = MutableStateFlow(0)
+    val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
+
+    private val _focusTokenInputEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val focusTokenInputEvent: SharedFlow<Unit> = _focusTokenInputEvent.asSharedFlow()
+
+    fun setSelectedTab(index: Int) {
+        _selectedTab.value = index
+    }
+
+    fun navigateToTokenConfiguration() {
+        _selectedTab.value = 6 // Settings tab
+        viewModelScope.launch {
+            _focusTokenInputEvent.emit(Unit)
+        }
+    }
+
     init {
         viewModelScope.launch {
+            loadAnalyticsData()
+        }
+        viewModelScope.launch {
             strips.collect { currentStrips ->
-                if (_selectedAnalyticsMac.value == null && currentStrips.isNotEmpty()) {
-                    _selectedAnalyticsMac.value = currentStrips.first().mac
-                } else if (_selectedAnalyticsMac.value != null && currentStrips.none { it.mac == _selectedAnalyticsMac.value }) {
-                    _selectedAnalyticsMac.value = currentStrips.firstOrNull()?.mac
+                val currentMac = _selectedAnalyticsMac.value
+                if (currentMac != null && currentStrips.isNotEmpty() && currentStrips.none { it.mac == currentMac }) {
+                    _selectedAnalyticsMac.value = null
+                    loadAnalyticsData()
                 }
-                loadAnalyticsData()
             }
         }
     }
@@ -173,6 +216,31 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Timers
+    fun addTimer(timer: OutletTimer) {
+        viewModelScope.launch {
+            repository.addTimer(timer)
+        }
+    }
+
+    fun toggleTimerPause(timerId: String) {
+        viewModelScope.launch {
+            repository.toggleTimerPause(timerId)
+        }
+    }
+
+    fun resetTimer(timerId: String) {
+        viewModelScope.launch {
+            repository.resetTimer(timerId)
+        }
+    }
+
+    fun deleteTimer(timerId: String) {
+        viewModelScope.launch {
+            repository.deleteTimer(timerId)
+        }
+    }
+
     // Analytics
     fun setTimeRange(range: String) {
         _selectedTimeRange.value = range
@@ -189,16 +257,63 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
         loadAnalyticsData()
     }
 
+    fun setTopConsumersTimeRange(range: String) {
+        _topConsumersTimeRange.value = range
+        loadTopConsumersData()
+    }
+
+    fun loadTopConsumersData() {
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val windowMs = when (_topConsumersTimeRange.value) {
+                "1h" -> 3600 * 1000L
+                "6h" -> 6 * 3600 * 1000L
+                "24h" -> 24 * 3600 * 1000L
+                "7d" -> 7 * 24 * 3600 * 1000L
+                "30d" -> 30L * 24 * 3600 * 1000L
+                "6m" -> 180L * 24 * 3600 * 1000L
+                "1y" -> 365L * 24 * 3600 * 1000L
+                else -> 7 * 24 * 3600 * 1000L
+            }
+            val since = now - windowMs
+            _topConsumers.value = repository.getTopConsumers(since, _topConsumersTimeRange.value)
+        }
+    }
+
+    fun loadPeriodSummary(startTs: Long, endTs: Long, mac: String = "__all__") {
+        summaryJob?.cancel()
+        summaryJob = viewModelScope.launch {
+            try {
+                val summary = repository.getAnalyticsSummary(startTs, endTs, mac)
+                // Replace state directly — NEVER accumulate or add to old values
+                _analyticsSummary.value = summary
+            } catch (_: CancellationException) {
+                // Expected when user quickly toggles periods
+            } catch (e: Exception) {
+                // Log error
+            }
+        }
+    }
+
     fun loadAnalyticsData() {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val windowMs = when (_selectedTimeRange.value) {
                 "1h" -> 3600 * 1000L
                 "6h" -> 6 * 3600 * 1000L
+                "24h" -> 24 * 3600 * 1000L
                 "7d" -> 7 * 24 * 3600 * 1000L
+                "30d" -> 30L * 24 * 3600 * 1000L
+                "6m" -> 180L * 24 * 3600 * 1000L
+                "1y" -> 365L * 24 * 3600 * 1000L
                 else -> 24 * 3600 * 1000L
             }
             val since = now - windowMs
+            loadPeriodSummary(
+                startTs = since / 1000L,
+                endTs = now / 1000L,
+                mac = _selectedAnalyticsMac.value ?: "__all__"
+            )
             val points = repository.getTelemetry(
                 mac = _selectedAnalyticsMac.value,
                 outlet = if (_selectedAnalyticsOutlet.value == 0) null else _selectedAnalyticsOutlet.value,
@@ -206,7 +321,7 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
                 timeRange = _selectedTimeRange.value
             )
             _chartTelemetry.value = points
-            _topConsumers.value = repository.getTopConsumers(since, _selectedTimeRange.value)
+            loadTopConsumersData()
         }
     }
 

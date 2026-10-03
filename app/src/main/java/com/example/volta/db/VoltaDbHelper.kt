@@ -5,13 +5,16 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.example.volta.model.Outlet
+import com.example.volta.model.OutletTimer
 import com.example.volta.model.PowerStrip
 import com.example.volta.model.Schedule
 import com.example.volta.model.TelemetryPoint
+import com.example.volta.model.TimerMode
 import com.example.volta.model.TopConsumer
 import com.example.volta.model.VoltaSettings
+import com.example.volta.security.SecureTokenManager
 
-class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class VoltaDbHelper(private val context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
 
     companion object {
         const val DATABASE_NAME = "volta.db"
@@ -92,6 +95,41 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
             CREATE TABLE settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
+            )
+            """.trimIndent()
+        )
+
+        createTimersTable(db)
+    }
+
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        createTimersTable(db)
+    }
+
+    private fun createTimersTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS timers (
+                id TEXT PRIMARY KEY,
+                strip_mac TEXT,
+                outlet INTEGER,
+                label TEXT,
+                mode TEXT,
+                target_action_on INTEGER,
+                duration_seconds INTEGER,
+                on_duration_seconds INTEGER,
+                off_duration_seconds INTEGER,
+                start_phase_on INTEGER,
+                repeat_count INTEGER,
+                current_cycle INTEGER,
+                is_running INTEGER,
+                is_paused INTEGER,
+                current_phase_on INTEGER,
+                remaining_seconds INTEGER,
+                total_seconds_in_phase INTEGER,
+                started_at INTEGER,
+                last_tick_at INTEGER
             )
             """.trimIndent()
         )
@@ -323,6 +361,98 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
         db.update("schedules", cv, "id = ?", arrayOf(id))
     }
 
+    fun upsertTimer(timer: OutletTimer) {
+        val db = writableDatabase
+        val cv = ContentValues().apply {
+            put("id", timer.id)
+            put("strip_mac", timer.stripMac)
+            put("outlet", timer.outlet)
+            put("label", timer.label)
+            put("mode", timer.mode.name)
+            put("target_action_on", if (timer.targetActionOn) 1 else 0)
+            put("duration_seconds", timer.durationSeconds)
+            put("on_duration_seconds", timer.onDurationSeconds)
+            put("off_duration_seconds", timer.offDurationSeconds)
+            put("start_phase_on", if (timer.startPhaseOn) 1 else 0)
+            put("repeat_count", timer.repeatCount)
+            put("current_cycle", timer.currentCycle)
+            put("is_running", if (timer.isRunning) 1 else 0)
+            put("is_paused", if (timer.isPaused) 1 else 0)
+            put("current_phase_on", if (timer.currentPhaseOn) 1 else 0)
+            put("remaining_seconds", timer.remainingSeconds)
+            put("total_seconds_in_phase", timer.totalSecondsInPhase)
+            put("started_at", timer.startedAt)
+            put("last_tick_at", timer.lastTickAt)
+        }
+        db.insertWithOnConflict("timers", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun getAllTimers(): List<OutletTimer> {
+        val db = readableDatabase
+        val list = mutableListOf<OutletTimer>()
+        val cursor = db.rawQuery("SELECT * FROM timers ORDER BY started_at DESC", null)
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                val modeStr = c.getString(c.getColumnIndexOrThrow("mode"))
+                val mode = try {
+                    TimerMode.valueOf(modeStr)
+                } catch (e: Exception) {
+                    TimerMode.COUNTDOWN
+                }
+                list.add(
+                    OutletTimer(
+                        id = c.getString(c.getColumnIndexOrThrow("id")),
+                        stripMac = c.getString(c.getColumnIndexOrThrow("strip_mac")),
+                        outlet = c.getInt(c.getColumnIndexOrThrow("outlet")),
+                        label = c.getString(c.getColumnIndexOrThrow("label")) ?: "",
+                        mode = mode,
+                        targetActionOn = c.getInt(c.getColumnIndexOrThrow("target_action_on")) == 1,
+                        durationSeconds = c.getLong(c.getColumnIndexOrThrow("duration_seconds")),
+                        onDurationSeconds = c.getLong(c.getColumnIndexOrThrow("on_duration_seconds")),
+                        offDurationSeconds = c.getLong(c.getColumnIndexOrThrow("off_duration_seconds")),
+                        startPhaseOn = c.getInt(c.getColumnIndexOrThrow("start_phase_on")) == 1,
+                        repeatCount = c.getInt(c.getColumnIndexOrThrow("repeat_count")),
+                        currentCycle = c.getInt(c.getColumnIndexOrThrow("current_cycle")),
+                        isRunning = c.getInt(c.getColumnIndexOrThrow("is_running")) == 1,
+                        isPaused = c.getInt(c.getColumnIndexOrThrow("is_paused")) == 1,
+                        currentPhaseOn = c.getInt(c.getColumnIndexOrThrow("current_phase_on")) == 1,
+                        remainingSeconds = c.getLong(c.getColumnIndexOrThrow("remaining_seconds")),
+                        totalSecondsInPhase = c.getLong(c.getColumnIndexOrThrow("total_seconds_in_phase")),
+                        startedAt = c.getLong(c.getColumnIndexOrThrow("started_at")),
+                        lastTickAt = c.getLong(c.getColumnIndexOrThrow("last_tick_at"))
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    fun deleteTimer(id: String) {
+        val db = writableDatabase
+        db.delete("timers", "id = ?", arrayOf(id))
+    }
+
+    fun updateTimerState(
+        id: String,
+        remainingSeconds: Long,
+        isRunning: Boolean,
+        isPaused: Boolean,
+        currentPhaseOn: Boolean,
+        currentCycle: Int,
+        lastTickAt: Long
+    ) {
+        val db = writableDatabase
+        val cv = ContentValues().apply {
+            put("remaining_seconds", remainingSeconds)
+            put("is_running", if (isRunning) 1 else 0)
+            put("is_paused", if (isPaused) 1 else 0)
+            put("current_phase_on", if (currentPhaseOn) 1 else 0)
+            put("current_cycle", currentCycle)
+            put("last_tick_at", lastTickAt)
+        }
+        db.update("timers", cv, "id = ?", arrayOf(id))
+    }
+
     fun insertTelemetry(point: TelemetryPoint) {
         val db = writableDatabase
         val cv = ContentValues().apply {
@@ -376,20 +506,20 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
 
     fun getTopConsumers(sinceTimestamp: Long, costPerKwh: Double): List<TopConsumer> {
         val db = readableDatabase
-        val result = mutableListOf<TopConsumer>()
-        // Calculate max energy - min energy per outlet in the time window
         val query = """
             SELECT t.mac, IFNULL(s.name, t.mac) as strip_name, t.outlet, IFNULL(o.name, 'Outlet ' || t.outlet) as outlet_name,
-                   MAX(t.energy_kwh) - MIN(t.energy_kwh) as consumed_kwh
+                   t.energy_kwh, t.power_w, t.timestamp
             FROM telemetry t
             LEFT JOIN strips s ON t.mac = s.mac
             LEFT JOIN outlets o ON t.mac = o.mac AND t.outlet = o.n
             WHERE t.timestamp >= ?
-            GROUP BY t.mac, t.outlet
-            HAVING consumed_kwh >= 0
-            ORDER BY consumed_kwh DESC
-            LIMIT 10
+            ORDER BY t.mac ASC, t.outlet ASC, t.timestamp ASC
         """.trimIndent()
+
+        data class ConsumerKey(val mac: String, val stripName: String, val outlet: Int, val outletName: String)
+        data class RawSample(val energyKwh: Double, val powerW: Double, val timestamp: Long)
+
+        val samplesMap = mutableMapOf<ConsumerKey, MutableList<RawSample>>()
 
         val cursor = db.rawQuery(query, arrayOf(sinceTimestamp.toString()))
         cursor.use { c ->
@@ -398,20 +528,66 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
                 val stripName = c.getString(1) ?: mac
                 val outlet = c.getInt(2)
                 val outletName = c.getString(3) ?: "Outlet $outlet"
-                val kwh = c.getDouble(4).coerceAtLeast(0.0)
+                val energyKwh = c.getDouble(4)
+                val powerW = c.getDouble(5)
+                val ts = c.getLong(6)
+
+                val key = ConsumerKey(mac, stripName, outlet, outletName)
+                samplesMap.getOrPut(key) { mutableListOf() }.add(RawSample(energyKwh, powerW, ts))
+            }
+        }
+
+        val result = mutableListOf<TopConsumer>()
+        for ((key, samples) in samplesMap) {
+            var outletKwh = 0.0
+            var meterIncrementsSum = 0.0
+            var hasPositiveMeter = false
+
+            // Sum only positive increments; ignore drops from hardware power loss or reboots
+            for (i in 1 until samples.size) {
+                val prev = samples[i - 1]
+                val curr = samples[i]
+                val delta = curr.energyKwh - prev.energyKwh
+                if (delta > 0.00001) {
+                    meterIncrementsSum += delta
+                    hasPositiveMeter = true
+                } else if (delta < -0.00001 && curr.energyKwh > 0.00001) {
+                    // Meter was zeroed on hard reboot: add the new accumulation
+                    meterIncrementsSum += curr.energyKwh
+                    hasPositiveMeter = true
+                }
+            }
+
+            if (hasPositiveMeter && meterIncrementsSum > 0.0001) {
+                outletKwh = meterIncrementsSum
+            } else {
+                // Fallback: integrate positive power samples
+                for (i in 1 until samples.size) {
+                    val prev = samples[i - 1]
+                    val curr = samples[i]
+                    val dtSec = ((curr.timestamp - prev.timestamp) / 1000.0).coerceIn(1.0, 300.0)
+                    val avgW = (prev.powerW + curr.powerW) / 2.0
+                    if (avgW > 0.0) {
+                        outletKwh += (avgW * dtSec) / (3600.0 * 1000.0)
+                    }
+                }
+            }
+
+            if (outletKwh > 0.0001) {
                 result.add(
                     TopConsumer(
-                        mac = mac,
-                        stripName = stripName,
-                        outlet = outlet,
-                        outletName = outletName,
-                        kwh = (kwh * 1000.0).toLong() / 1000.0,
-                        cost = (kwh * costPerKwh * 100.0).toLong() / 100.0
+                        mac = key.mac,
+                        stripName = key.stripName,
+                        outlet = key.outlet,
+                        outletName = key.outletName,
+                        kwh = (outletKwh * 1000.0).toLong() / 1000.0,
+                        cost = (outletKwh * costPerKwh * 100.0).toLong() / 100.0
                     )
                 )
             }
         }
-        return result
+
+        return result.sortedByDescending { it.kwh }.take(5)
     }
 
     fun clearTelemetry() {
@@ -428,11 +604,13 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
                 map[c.getString(0)] = c.getString(1) ?: ""
             }
         }
+        val secureToken = SecureTokenManager.getInstance(context).getToken()
+        val token = if (secureToken.isNotBlank()) secureToken else (map["serverToken"] ?: "")
         return VoltaSettings(
-            serverUrl = map["serverUrl"] ?: "http://192.168.1.100:8080",
-            serverToken = map["serverToken"] ?: "",
+            serverUrl = map["serverUrl"]?.takeIf { it.isNotBlank() && !it.contains("192.168.1.100") } ?: "https://volta.03092017.xyz",
+            serverToken = token,
             isStandalone = map["isStandalone"]?.toBooleanStrictOrNull() ?: true,
-            costPerKwh = map["costPerKwh"]?.toDoubleOrNull() ?: 1.2,
+            costPerKwh = map["costPerKwh"]?.toDoubleOrNull() ?: 2.18,
             currency = map["currency"] ?: "EGP",
             ntfyTopic = map["ntfyTopic"] ?: "",
             alertOfflineMin = map["alertOfflineMin"]?.toIntOrNull() ?: 10,
@@ -449,10 +627,13 @@ class VoltaDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME,
     }
 
     fun saveSettings(s: VoltaSettings) {
+        // Securely store token in Keystore-backed EncryptedSharedPreferences
+        SecureTokenManager.getInstance(context).saveToken(s.serverToken)
+
         val db = writableDatabase
         val map = mapOf(
             "serverUrl" to s.serverUrl,
-            "serverToken" to s.serverToken,
+            "serverToken" to "", // Stored securely in SecureTokenManager, not plain text in SQLite
             "isStandalone" to s.isStandalone.toString(),
             "costPerKwh" to s.costPerKwh.toString(),
             "currency" to s.currency,

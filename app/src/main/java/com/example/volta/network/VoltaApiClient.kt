@@ -1,8 +1,11 @@
 package com.example.volta.network
 
+import com.example.volta.model.AnalyticsSummary
 import com.example.volta.model.Outlet
+import com.example.volta.model.OutletTimer
 import com.example.volta.model.PowerStrip
 import com.example.volta.model.TelemetryPoint
+import com.example.volta.model.TimerMode
 import com.example.volta.model.TopConsumer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,6 +19,9 @@ import java.util.concurrent.TimeUnit
 
 class VoltaApiClient {
 
+    var onSessionExpired: (() -> Unit)? = null
+    var onAdminForbidden: (() -> Unit)? = null
+
     data class ServerHealthInfo(
         val ok: Boolean,
         val serverIp: String,
@@ -26,6 +32,15 @@ class VoltaApiClient {
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val response = chain.proceed(chain.request())
+            if (response.code == 401) {
+                onSessionExpired?.invoke()
+            } else if (response.code == 403) {
+                onAdminForbidden?.invoke()
+            }
+            response
+        }
         .build()
 
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -144,7 +159,8 @@ class VoltaApiClient {
                                     outletsList.add(Outlet(n, defaultName))
                                 }
                             }
-                            list.add(PowerStrip(mac, name, model, fw, ip, online, voltageV, rssi, lastSeen, outletsList))
+                            val serverTotalPowerW = sObj.optDouble("total_power_w", sObj.optDouble("power_w", -1.0))
+                            list.add(PowerStrip(mac, name, model, fw, ip, online, voltageV, rssi, lastSeen, outletsList, serverTotalPowerW = serverTotalPowerW))
                         }
                         return@withContext Result.success(list)
                     }
@@ -352,12 +368,18 @@ class VoltaApiClient {
     suspend fun fetchAnalyticsLeaderboard(
         baseUrl: String,
         token: String,
+        startTs: Long,
+        endTs: Long,
         range: String,
-        costPerKwh: Double
+        costPerKwh: Double,
+        knownStrips: List<PowerStrip> = emptyList()
     ): Result<List<TopConsumer>> = withContext(Dispatchers.IO) {
         try {
             val url = "${baseUrl.trimEnd('/')}/api/analytics/leaderboard"
             val payload = JSONObject().apply {
+                put("start_ts", startTs)
+                put("end_ts", endTs)
+                put("limit", 5)
                 put("range", range)
             }
             val reqBuilder = Request.Builder()
@@ -379,16 +401,35 @@ class VoltaApiClient {
                 val result = mutableListOf<TopConsumer>()
                 for (i in 0 until itemsArray.length()) {
                     val item = itemsArray.getJSONObject(i)
-                    val mac = item.optString("mac", "")
-                    val stripName = item.optString("strip_name", "MTTL ${mac.takeLast(6)}")
+                    val rawMac = item.optString("mac", "")
                     val outlet = item.optInt("outlet", 1)
-                    val outletName = item.optString("outlet_name", "Outlet $outlet")
-                    val kwh = item.optDouble("kwh", item.optDouble("consumed_kwh", 0.0))
-                    val cost = item.optDouble("cost", (kwh * costPerKwh * 100).toLong() / 100.0)
+
+                    val strip = knownStrips.find {
+                        it.mac.equals(rawMac, ignoreCase = true) ||
+                        it.mac.replace(":", "").equals(rawMac.replace(":", ""), ignoreCase = true)
+                    }
+                    val outletObj = strip?.outlets?.find { it.n == outlet }
+
+                    val stripName = item.optString("strip_name").takeIf { it.isNotBlank() }
+                        ?: strip?.displayName
+                        ?: "MTTL ${rawMac.replace(":", "").takeLast(6).uppercase()}"
+
+                    val outletName = item.optString("outlet_name").takeIf { it.isNotBlank() }
+                        ?: outletObj?.name?.takeIf { it.isNotBlank() && !it.equals("Outlet $outlet", ignoreCase = true) }
+                        ?: outletObj?.name
+                        ?: "Outlet $outlet"
+
+                    val kwh = when {
+                        item.has("energy_kwh") -> item.getDouble("energy_kwh")
+                        item.has("kwh") -> item.getDouble("kwh")
+                        item.has("consumed_kwh") -> item.getDouble("consumed_kwh")
+                        else -> 0.0
+                    }
+                    val cost = (kwh * costPerKwh * 100).toLong() / 100.0
 
                     result.add(
                         TopConsumer(
-                            mac = mac,
+                            mac = rawMac,
                             stripName = stripName,
                             outlet = outlet,
                             outletName = outletName,
@@ -398,6 +439,76 @@ class VoltaApiClient {
                     )
                 }
                 Result.success(result)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchAnalyticsLeaderboard(
+        baseUrl: String,
+        token: String,
+        range: String,
+        costPerKwh: Double
+    ): Result<List<TopConsumer>> {
+        val nowSec = System.currentTimeMillis() / 1000L
+        val startSec = when (range) {
+            "1h" -> nowSec - 3600L
+            "6h" -> nowSec - 6 * 3600L
+            "24h" -> nowSec - 24 * 3600L
+            "7d" -> nowSec - 7 * 86400L
+            "30d" -> nowSec - 30 * 86400L
+            "6m" -> nowSec - 180 * 86400L
+            "1y" -> nowSec - 365 * 86400L
+            else -> nowSec - 7 * 86400L
+        }
+        return fetchAnalyticsLeaderboard(baseUrl, token, startSec, nowSec, range, costPerKwh)
+    }
+
+    suspend fun fetchAnalyticsSummary(
+        baseUrl: String,
+        token: String,
+        startTs: Long,
+        endTs: Long,
+        mac: String = "__all__"
+    ): Result<AnalyticsSummary> = withContext(Dispatchers.IO) {
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/analytics/summary"
+            val payload = JSONObject().apply {
+                put("start_ts", startTs)
+                put("end_ts", endTs)
+                put("mac", if (mac.isBlank()) "__all__" else mac)
+            }
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .post(payload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(reqBuilder, token)
+
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+                val body = resp.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val json = JSONObject(body)
+                val summaryObj = json.optJSONObject("summary")
+                    ?: return@withContext Result.failure(Exception("Missing summary field in response"))
+
+                val summary = AnalyticsSummary(
+                    energyKwh = summaryObj.optDouble("energy_kwh", 0.0),
+                    wattHours = summaryObj.optDouble("watt_hours", 0.0),
+                    avgPowerW = summaryObj.optDouble("avg_power_w", 0.0),
+                    peakPowerW = summaryObj.optDouble("peak_power_w", 0.0),
+                    minVoltageV = if (summaryObj.has("min_voltage_v") && !summaryObj.isNull("min_voltage_v")) summaryObj.getDouble("min_voltage_v") else null,
+                    maxVoltageV = if (summaryObj.has("max_voltage_v") && !summaryObj.isNull("max_voltage_v")) summaryObj.getDouble("max_voltage_v") else null,
+                    avgVoltageV = if (summaryObj.has("avg_voltage_v") && !summaryObj.isNull("avg_voltage_v")) summaryObj.getDouble("avg_voltage_v") else null,
+                    avgTempC = if (summaryObj.has("avg_temp_c") && !summaryObj.isNull("avg_temp_c")) summaryObj.getDouble("avg_temp_c") else null,
+                    samples = summaryObj.optLong("samples", 0L),
+                    stripsCount = summaryObj.optInt("strips_count", 1),
+                    cost = summaryObj.optDouble("cost", 0.0),
+                    currency = summaryObj.optString("currency", "EGP"),
+                    costPerKwh = summaryObj.optDouble("cost_per_kwh", 2.18)
+                )
+                Result.success(summary)
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -422,8 +533,15 @@ class VoltaApiClient {
             addAuthHeaders(reqBuilder, token)
             client.newCall(reqBuilder.build()).execute().use { resp ->
                 val body = resp.body?.string() ?: ""
-                if (resp.isSuccessful) Result.success(body)
-                else Result.failure(Exception("HTTP ${resp.code}: $body"))
+                if (resp.isSuccessful) {
+                    Result.success(body)
+                } else if (resp.code == 403) {
+                    Result.failure(Exception("Admin access required (HTTP 403): This diagnostic tool is restricted to administrator tokens."))
+                } else if (resp.code == 401) {
+                    Result.failure(Exception("Authentication required (HTTP 401): Token required. Please configure your token in Settings."))
+                } else {
+                    Result.failure(Exception("HTTP ${resp.code}: $body"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -473,6 +591,131 @@ class VoltaApiClient {
                 .url(url)
                 .post(payload.toString().toRequestBody(jsonMediaType))
             addAuthHeaders(reqBuilder, token)
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.isSuccessful) Result.success(true)
+                else Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchTimers(baseUrl: String, token: String): Result<List<OutletTimer>> = withContext(Dispatchers.IO) {
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/timers"
+            val reqBuilder = Request.Builder().url(url)
+            addAuthHeaders(reqBuilder, token)
+
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+                val body = resp.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val json = JSONObject(body)
+                val timersArray = json.optJSONArray("timers") ?: json.optJSONArray("data") ?: JSONArray()
+                val list = mutableListOf<OutletTimer>()
+
+                val now = System.currentTimeMillis()
+                for (i in 0 until timersArray.length()) {
+                    val tObj = timersArray.getJSONObject(i)
+                    val id = tObj.optString("id", java.util.UUID.randomUUID().toString())
+                    val mac = tObj.optString("mac")
+                    val outlet = tObj.optInt("outlet", 0)
+                    val on = tObj.optBoolean("on", false)
+                    val modeStr = tObj.optString("mode", "countdown")
+                    val mode = if (modeStr.equals("cyclic", ignoreCase = true)) TimerMode.CYCLIC else TimerMode.COUNTDOWN
+                    val onSec = tObj.optLong("on_sec", 1800)
+                    val offSec = tObj.optLong("off_sec", 1800)
+                    val repeatStr = tObj.optString("repeat", "once")
+                    val repeatCount = when (repeatStr) {
+                        "once" -> 1
+                        "forever" -> -1
+                        else -> tObj.optInt("repeat_n", 1)
+                    }
+                    val label = tObj.optString("label", "")
+                    val enabled = tObj.optBoolean("enabled", true)
+                    val phase = tObj.optString("phase", "on")
+                    val phaseStartedRaw = tObj.optLong("phase_started", now / 1000)
+                    val phaseStartedMs = if (phaseStartedRaw < 10000000000L) phaseStartedRaw * 1000L else phaseStartedRaw
+                    val cyclesDone = tObj.optInt("cycles_done", 0)
+
+                    // Accurate countdown remaining time calculation based on server phase
+                    val elapsedSec = ((now - phaseStartedMs) / 1000L).coerceAtLeast(0)
+                    val totalSecInPhase = if (mode == TimerMode.COUNTDOWN) onSec else (if (phase == "on") onSec else offSec)
+                    val remainingSec = (totalSecInPhase - elapsedSec).coerceAtLeast(0)
+
+                    list.add(
+                        OutletTimer(
+                            id = id,
+                            stripMac = mac,
+                            outlet = outlet,
+                            label = label,
+                            mode = mode,
+                            targetActionOn = on,
+                            durationSeconds = onSec,
+                            onDurationSeconds = onSec,
+                            offDurationSeconds = offSec,
+                            startPhaseOn = on,
+                            repeatCount = repeatCount,
+                            currentCycle = cyclesDone,
+                            isRunning = enabled && remainingSec > 0,
+                            isPaused = !enabled,
+                            currentPhaseOn = phase == "on",
+                            remainingSeconds = remainingSec,
+                            totalSecondsInPhase = totalSecInPhase,
+                            startedAt = phaseStartedMs,
+                            lastTickAt = now,
+                            phase = phase,
+                            phaseStarted = phaseStartedMs
+                        )
+                    )
+                }
+                Result.success(list)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createOrUpdateTimer(baseUrl: String, token: String, timer: OutletTimer): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/timers"
+            val payload = JSONObject().apply {
+                put("id", timer.id)
+                put("mac", timer.stripMac)
+                put("outlet", timer.outlet)
+                put("on", timer.targetActionOn)
+                put("mode", if (timer.mode == TimerMode.CYCLIC) "cyclic" else "countdown")
+                put("on_sec", timer.onDurationSeconds)
+                put("off_sec", timer.offDurationSeconds)
+                put("repeat", timer.repeatType)
+                put("repeat_n", if (timer.repeatCount > 0) timer.repeatCount else 1)
+                put("label", timer.label)
+                put("enabled", timer.isRunning && !timer.isPaused)
+                put("phase_started", (timer.phaseStarted / 1000L))
+            }
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .post(payload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(reqBuilder, token)
+
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.isSuccessful) Result.success(true)
+                else Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteTimer(baseUrl: String, token: String, timerId: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/timers?id=$timerId"
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .delete()
+            addAuthHeaders(reqBuilder, token)
+
             client.newCall(reqBuilder.build()).execute().use { resp ->
                 if (resp.isSuccessful) Result.success(true)
                 else Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))

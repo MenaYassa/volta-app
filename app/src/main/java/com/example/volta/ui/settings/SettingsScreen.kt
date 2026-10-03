@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,12 +15,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,10 +38,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,10 +51,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -54,6 +69,8 @@ import com.example.volta.theme.VoltaRed
 import com.example.volta.theme.VoltaYellow
 import com.example.volta.ui.components.TagBadge
 import com.example.volta.viewmodel.VoltaViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 
 @Composable
 fun SettingsScreen(
@@ -63,6 +80,10 @@ fun SettingsScreen(
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
 
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val listState = rememberLazyListState()
+
     var hasNotifPermission by remember {
         mutableStateOf(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -71,20 +92,50 @@ fun SettingsScreen(
         )
     }
 
-    val notifPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            hasNotifPermission = granted
-            if (granted) viewModel.sendTestNotification()
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var hasWifiPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
+            } else true
+        )
+    }
+
+    val multiplePermissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { map ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                hasNotifPermission = map[Manifest.permission.POST_NOTIFICATIONS] ?: hasNotifPermission
+                hasWifiPermission = map[Manifest.permission.NEARBY_WIFI_DEVICES] ?: hasWifiPermission
+            }
+            hasLocationPermission = map[Manifest.permission.ACCESS_FINE_LOCATION] ?: hasLocationPermission
+            if (hasNotifPermission) {
+                viewModel.sendTestNotification()
+            }
         }
     )
+
+    fun requestAllPermissions() {
+        val perms = mutableListOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            perms.add(Manifest.permission.POST_NOTIFICATIONS)
+            perms.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+        perms.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        perms.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        multiplePermissionsLauncher.launch(perms.toTypedArray())
+    }
 
     var isStandalone by remember(settings) { mutableStateOf(settings.isStandalone) }
     var serverUrl by remember(settings) { mutableStateOf(settings.serverUrl) }
     var serverToken by remember(settings) { mutableStateOf(settings.serverToken) }
     var costPerKwh by remember(settings) { mutableStateOf(settings.costPerKwh.toString()) }
     var currency by remember(settings) { mutableStateOf(settings.currency) }
-    var ntfyTopic by remember(settings) { mutableStateOf(settings.ntfyTopic) }
     var alertOfflineMin by remember(settings) { mutableStateOf(settings.alertOfflineMin.toString()) }
     var notifyOffline by remember(settings) { mutableStateOf(settings.notifyOffline) }
     var notifySwitch by remember(settings) { mutableStateOf(settings.notifySwitch) }
@@ -99,7 +150,19 @@ fun SettingsScreen(
     var saveNotice by remember { mutableStateOf(false) }
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
 
+    // Automatically navigate, scroll to server token input, and pop open software keyboard
+    LaunchedEffect(Unit) {
+        viewModel.focusTokenInputEvent.collect {
+            isStandalone = false
+            listState.animateScrollToItem(1) // Scroll to Controller Mode / Server URL & Token
+            delay(250)
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
@@ -221,7 +284,12 @@ fun SettingsScreen(
                             value = serverToken,
                             onValueChange = { serverToken = it },
                             label = { Text("Auth Token (Bearer)") },
-                            modifier = Modifier.fillMaxWidth()
+                            placeholder = { Text("Paste your server token here") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester)
+                                .testTag("settings_server_token_input"),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
                         )
                     }
                 }
@@ -271,7 +339,7 @@ fun SettingsScreen(
             }
         }
 
-        // Notifications & Alerts
+        // Device Event Alerts (Direct Android Notifications)
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -281,25 +349,16 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Push Alerts (ntfy.sh)",
+                        text = "Device Event Triggers",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Receive notifications on strip dropouts, high temperature, or voltage spikes.",
+                        text = "Automatic push alerts dispatched directly to this mobile device when critical conditions occur.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = ntfyTopic,
-                        onValueChange = { ntfyTopic = it },
-                        label = { Text("ntfy Topic Name (e.g. my-volta-alerts)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
                     Spacer(modifier = Modifier.height(10.dp))
 
                     SettingToggleRow(
@@ -339,7 +398,7 @@ fun SettingsScreen(
             }
         }
 
-        // Android System Notifications
+        // System Permissions & Hardware Access
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -354,55 +413,71 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "Android System Notifications",
+                            text = "System Permissions & Hardware Status",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Icon(
-                            imageVector = Icons.Default.NotificationsActive,
-                            contentDescription = "Notifications",
-                            tint = if (hasNotifPermission) VoltaGreen else VoltaRed
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "Permissions",
+                            tint = if (hasNotifPermission && hasLocationPermission && hasWifiPermission) VoltaGreen else VoltaYellow
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Allows Volta to deliver instant status bar alerts when strip pairing handshakes complete or when critical voltage and temperature events occur.",
+                        text = "Review operating system permissions granted to Volta for local device discovery, background monitoring, and instant push notifications.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Permission Status",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = if (hasNotifPermission) "Granted — alert channels active" else "Denied / Not yet granted",
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    // 1. Notification Permission
+                    PermissionStatusRow(
+                        title = "Push Notifications",
+                        subtitle = "Real-time alerts for offline devices, high temperature, and voltage safety.",
+                        isGranted = hasNotifPermission,
+                        icon = Icons.Default.NotificationsActive
+                    )
 
-                        if (!hasNotifPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            OutlinedButton(
-                                onClick = { notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                                modifier = Modifier.testTag("request_settings_notification_permission")
-                            ) {
-                                Text("Grant Permission")
-                            }
-                        } else {
-                            TagBadge(text = "Granted", color = VoltaGreen)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // 2. Location Permission
+                    PermissionStatusRow(
+                        title = "Precise Location (GPS)",
+                        subtitle = "Required by Android OS for Wi-Fi AP scanning and sunrise/sunset solar calculation.",
+                        isGranted = hasLocationPermission,
+                        icon = Icons.Default.LocationOn
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // 3. Nearby Wi-Fi Devices Permission
+                    PermissionStatusRow(
+                        title = "Nearby Wi-Fi Devices",
+                        subtitle = "Direct Wi-Fi scanning to detect, pair, and configure MTTL power strips.",
+                        isGranted = hasWifiPermission,
+                        icon = Icons.Default.Wifi
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    val allPermissionsGranted = hasNotifPermission && hasLocationPermission && hasWifiPermission
+
+                    if (!allPermissionsGranted) {
+                        Button(
+                            onClick = { requestAllPermissions() },
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = VoltaBlue),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("grant_missing_permissions_button")
+                        ) {
+                            Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Grant Missing Permissions", fontWeight = FontWeight.Bold)
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedButton(
                         onClick = { viewModel.sendTestNotification() },
@@ -468,9 +543,9 @@ fun SettingsScreen(
                         serverUrl = serverUrl,
                         serverToken = serverToken,
                         isStandalone = isStandalone,
-                        costPerKwh = costPerKwh.toDoubleOrNull() ?: 1.2,
+                        costPerKwh = costPerKwh.toDoubleOrNull() ?: 2.18,
                         currency = currency.ifBlank { "EGP" },
-                        ntfyTopic = ntfyTopic,
+                        ntfyTopic = "",
                         alertOfflineMin = alertOfflineMin.toIntOrNull() ?: 10,
                         notifyOffline = notifyOffline,
                         notifySwitch = notifySwitch,
@@ -502,6 +577,50 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PermissionStatusRow(
+    title: String,
+    subtitle: String,
+    isGranted: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                color = if (isGranted) VoltaGreen.copy(alpha = 0.15f) else VoltaRed.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(34.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (isGranted) VoltaGreen else VoltaRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Column {
+                Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(text = subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        TagBadge(
+            text = if (isGranted) "Granted" else "Missing",
+            color = if (isGranted) VoltaGreen else VoltaRed
+        )
     }
 }
 

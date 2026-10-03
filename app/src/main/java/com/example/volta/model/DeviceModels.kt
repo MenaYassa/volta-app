@@ -27,10 +27,11 @@ data class PowerStrip(
         Outlet(3, "Outlet 3"),
         Outlet(4, "Outlet 4")
     ),
-    val pendingCommands: Int = 0
+    val pendingCommands: Int = 0,
+    val serverTotalPowerW: Double = -1.0
 ) {
     val totalPowerW: Double
-        get() = outlets.sumOf { it.powerW }
+        get() = if (serverTotalPowerW >= 0.0) serverTotalPowerW else outlets.sumOf { it.powerW }
 
     val totalEnergyKwh: Double
         get() = outlets.sumOf { it.energyKwh }
@@ -59,6 +60,62 @@ data class Schedule(
     val enabled: Boolean = true
 )
 
+enum class TimerMode {
+    COUNTDOWN, // Turn ON or OFF after duration
+    CYCLIC     // Alternate: ON for onDuration, OFF for offDuration
+}
+
+data class OutletTimer(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val stripMac: String,
+    val outlet: Int, // 0 for Master (All), 1..4 for individual
+    val label: String = "",
+    val mode: TimerMode = TimerMode.COUNTDOWN,
+    val targetActionOn: Boolean = false, // true = Turn ON, false = Turn OFF
+    val durationSeconds: Long = 1800,
+    val onDurationSeconds: Long = 900,
+    val offDurationSeconds: Long = 2700,
+    val startPhaseOn: Boolean = true,
+    val repeatCount: Int = 1, // -1 means infinite/forever, 1 means once, >1 means N times
+    val currentCycle: Int = 0,
+    val isRunning: Boolean = true,
+    val isPaused: Boolean = false,
+    val currentPhaseOn: Boolean = false,
+    val remainingSeconds: Long = 1800,
+    val totalSecondsInPhase: Long = 1800,
+    val startedAt: Long = System.currentTimeMillis(),
+    val lastTickAt: Long = System.currentTimeMillis(),
+    val phase: String = "on", // "on" or "off"
+    val phaseStarted: Long = startedAt
+) {
+    val isForever: Boolean get() = repeatCount <= -1 || repeatCount == 0
+
+    val repeatType: String
+        get() = when {
+            repeatCount == 1 -> "once"
+            repeatCount > 1 -> "times"
+            else -> "forever"
+        }
+
+    val progress: Float
+        get() = if (totalSecondsInPhase > 0) {
+            1f - (remainingSeconds.toFloat() / totalSecondsInPhase.toFloat()).coerceIn(0f, 1f)
+        } else 0f
+
+    val formattedRemaining: String
+        get() {
+            val totalSec = remainingSeconds.coerceAtLeast(0)
+            val hours = totalSec / 3600
+            val minutes = (totalSec % 3600) / 60
+            val seconds = totalSec % 60
+            return if (hours > 0) {
+                String.format("%02d:%02d:%02d", hours, minutes, seconds)
+            } else {
+                String.format("%02d:%02d", minutes, seconds)
+            }
+        }
+}
+
 data class TelemetryPoint(
     val id: Long = 0,
     val timestamp: Long,
@@ -79,11 +136,27 @@ data class TopConsumer(
     val cost: Double
 )
 
+data class AnalyticsSummary(
+    val energyKwh: Double,
+    val wattHours: Double,
+    val avgPowerW: Double,
+    val peakPowerW: Double,
+    val minVoltageV: Double? = null,
+    val maxVoltageV: Double? = null,
+    val avgVoltageV: Double? = null,
+    val avgTempC: Double? = null,
+    val samples: Long = 0,
+    val stripsCount: Int = 1,
+    val cost: Double = 0.0,
+    val currency: String = "EGP",
+    val costPerKwh: Double = 2.18
+)
+
 data class VoltaSettings(
-    val serverUrl: String = "http://192.168.1.100:8080",
+    val serverUrl: String = "https://volta.03092017.xyz",
     val serverToken: String = "",
     val isStandalone: Boolean = true,
-    val costPerKwh: Double = 1.2,
+    val costPerKwh: Double = 2.18,
     val currency: String = "EGP",
     val ntfyTopic: String = "",
     val alertOfflineMin: Int = 10,
