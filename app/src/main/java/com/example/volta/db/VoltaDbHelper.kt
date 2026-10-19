@@ -651,7 +651,7 @@ class VoltaDbHelper(private val context: Context) : SQLiteOpenHelper(context, DA
     fun loadSettings(): VoltaSettings {
         val db = readableDatabase
         val map = mutableMapOf<String, String>()
-        val cursor = db.rawQuery("SELECT key, value FROM settings", null)
+        val cursor = db.rawQuery("SELECT `key`, value FROM settings", null)
         cursor.use { c ->
             while (c.moveToNext()) {
                 map[c.getString(0)] = c.getString(1) ?: ""
@@ -729,7 +729,7 @@ class VoltaDbHelper(private val context: Context) : SQLiteOpenHelper(context, DA
 
     fun getSavedStripOrder(): List<String> {
         val db = readableDatabase
-        val cursor = db.rawQuery("SELECT value FROM settings WHERE key = 'strip_order'", null)
+        val cursor = db.rawQuery("SELECT value FROM settings WHERE `key` = 'strip_order'", null)
         cursor.use { c ->
             if (c.moveToNext()) {
                 val str = c.getString(0) ?: ""
