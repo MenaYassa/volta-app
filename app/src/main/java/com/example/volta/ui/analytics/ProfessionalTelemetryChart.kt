@@ -58,11 +58,11 @@ import com.example.volta.theme.VoltaBlue
 @Composable
 fun ProfessionalTelemetryChart(
     dataPoints: List<Double>,
+    modifier: Modifier = Modifier,
     lineColor: Color = VoltaBlue,
     unit: String = "",
     title: String = "Telemetry",
-    icon: ImageVector = Icons.Default.ShowChart,
-    modifier: Modifier = Modifier
+    icon: ImageVector = Icons.Default.ShowChart
 ) {
     if (dataPoints.isEmpty()) {
         Card(

@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.example"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.aistudio.volta.kxwz"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -18,7 +18,7 @@ android {
 
     signingConfigs {
         getByName("debug") {
-            val debugKeystore = file("${rootDir}/debug.keystore")
+            val debugKeystore = file("$rootDir/debug.keystore")
             if (debugKeystore.exists()) {
                 storeFile = debugKeystore
                 storePassword = "android"
@@ -33,7 +33,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -47,13 +47,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlin {
-        jvmToolchain(17)
-    }
-
     buildFeatures {
         compose = true
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {

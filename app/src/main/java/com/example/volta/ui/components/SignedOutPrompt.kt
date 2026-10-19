@@ -38,9 +38,9 @@ import com.example.volta.viewmodel.VoltaViewModel
 @Composable
 fun SignedOutPrompt(
     viewModel: VoltaViewModel,
+    modifier: Modifier = Modifier,
     title: String = "Authentication Required",
-    subtitle: String = "Sign in with your Volta Google account or enter a user token to access and manage your power strips, telemetry, and automated schedules.",
-    modifier: Modifier = Modifier
+    subtitle: String = "Sign in with your Volta Google account or enter a user token to access and manage your power strips, telemetry, and automated schedules."
 ) {
     Box(
         modifier = modifier

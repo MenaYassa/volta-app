@@ -1,5 +1,6 @@
 package com.example.volta.ui.control
 
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -919,8 +920,8 @@ private fun KpiTile(
     label: String,
     value: String,
     subtext: String,
-    valueColor: Color = Color.White,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    valueColor: Color = Color.White
 ) {
     Column(modifier = modifier) {
         Row(
@@ -959,6 +960,14 @@ private fun KpiTile(
 fun SlickPowerStripCard(
     strip: PowerStrip,
     allExpanded: Boolean,
+    onToggleOutlet: (Int, Boolean) -> Unit,
+    onToggleMaster: (Boolean) -> Unit,
+    onToggleLock: (Int) -> Unit,
+    onRequestRenameOutlet: (Outlet) -> Unit,
+    onRequestRenameStrip: () -> Unit,
+    onRequestQuickTimer: (Int) -> Unit,
+    onOpenGuard: () -> Unit,
+    modifier: Modifier = Modifier,
     homeName: String? = null,
     isDragging: Boolean = false,
     dragOffsetY: Float = 0f,
@@ -969,17 +978,9 @@ fun SlickPowerStripCard(
     onDragEnd: () -> Unit = {},
     onMoveUp: () -> Unit = {},
     onMoveDown: () -> Unit = {},
-    onToggleOutlet: (Int, Boolean) -> Unit,
-    onToggleMaster: (Boolean) -> Unit,
-    onToggleLock: (Int) -> Unit,
-    onRequestRenameOutlet: (Outlet) -> Unit,
-    onRequestRenameStrip: () -> Unit,
-    onRequestQuickTimer: (Int) -> Unit,
     onRequestReboot: () -> Unit = {},
     onRequestDelete: () -> Unit = {},
-    onOpenGuard: () -> Unit,
-    onOpenShortcutDrawer: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onOpenShortcutDrawer: () -> Unit = {}
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     var isExpanded by remember(allExpanded) { mutableStateOf(allExpanded) }
@@ -1602,7 +1603,7 @@ private fun SlickOutletTile(
             ) {
                 Box(
                     modifier = Modifier
-                        .offset(x = thumbOffset)
+                        .offset { IntOffset(x = thumbOffset.roundToPx(), y = 0) }
                         .size(24.dp)
                         .shadow(elevation = 2.dp, shape = CircleShape)
                         .background(Color.White, CircleShape)

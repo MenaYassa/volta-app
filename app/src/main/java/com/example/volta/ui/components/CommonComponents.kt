@@ -118,9 +118,9 @@ fun StatBox(
 @Composable
 fun TagBadge(
     text: String,
+    modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    bgColor: Color = MaterialTheme.colorScheme.surfaceVariant,
-    modifier: Modifier = Modifier
+    bgColor: Color = MaterialTheme.colorScheme.surfaceVariant
 ) {
     Surface(
         color = bgColor,
@@ -142,8 +142,8 @@ fun TagBadge(
 fun InteractiveToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    enabled: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val trackBg by animateColorAsState(
         targetValue = if (!enabled) Color(0xFF64748B).copy(alpha = 0.35f)
@@ -215,9 +215,9 @@ fun RenameDialog(
 @Composable
 fun TelemetryLineChart(
     dataPoints: List<Double>,
+    modifier: Modifier = Modifier,
     lineColor: Color = VoltaBlue,
-    unit: String = "",
-    modifier: Modifier = Modifier
+    unit: String = ""
 ) {
     if (dataPoints.isEmpty()) {
         Box(
@@ -522,8 +522,8 @@ fun SafetyGuardAlertBanner(
 fun PillBadge(
     text: String,
     color: Color,
-    dotColor: Color? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    dotColor: Color? = null
 ) {
     Surface(
         shape = RoundedCornerShape(8.dp),

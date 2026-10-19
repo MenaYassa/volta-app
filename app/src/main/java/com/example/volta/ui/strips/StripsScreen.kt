@@ -1,5 +1,6 @@
 package com.example.volta.ui.strips
 
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -985,7 +986,7 @@ private fun StripOutletTile(
             ) {
                 Box(
                     modifier = Modifier
-                        .offset(x = thumbOffset)
+                        .offset { IntOffset(x = thumbOffset.roundToPx(), y = 0) }
                         .size(24.dp)
                         .shadow(elevation = 2.dp, shape = CircleShape)
                         .background(Color.White, CircleShape)

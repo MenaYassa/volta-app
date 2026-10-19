@@ -65,9 +65,9 @@ fun PhysicalStripEnclosure(
     strip: PowerStrip,
     onToggleOutlet: (Int, Boolean) -> Unit,
     onToggleMaster: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
     onLockedOutletClick: (Int) -> Unit = {},
-    onLongClickEnclosure: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    onLongClickEnclosure: (() -> Unit)? = null
 ) {
     val haptic = LocalHapticFeedback.current
     val outlets = strip.outlets

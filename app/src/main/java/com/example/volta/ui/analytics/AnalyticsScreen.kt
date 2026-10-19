@@ -1573,14 +1573,14 @@ private fun InsightStatTile(
 @Composable
 fun SlickTelemetryChartCanvas(
     dataPoints: List<Double>,
-    timestamps: List<Long> = emptyList(),
     lineColor: Color,
     fillColor: Color,
     minExpected: Double,
     maxExpected: Double,
     yUnit: String,
-    chartHeight: androidx.compose.ui.unit.Dp = 110.dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    timestamps: List<Long> = emptyList(),
+    chartHeight: androidx.compose.ui.unit.Dp = 110.dp
 ) {
     val displayPoints = remember(dataPoints) {
         if (dataPoints.isEmpty()) {

@@ -296,8 +296,8 @@ fun GoogleUserProfileCard(
 @Composable
 fun VoltaLoginCard(
     viewModel: VoltaViewModel,
-    onSuccess: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -315,14 +315,15 @@ fun VoltaLoginCard(
     ) { result ->
         val data = result.data
         if (data != null) {
+            @Suppress("DEPRECATION")
             val task = GoogleSignIn.getSignedInAccountFromIntent(data)
             try {
                 val account = task.getResult(ApiException::class.java)
-                val idToken = account.idToken
-                val email = account.email ?: "your Google account"
-                if (!idToken.isNullOrBlank()) {
+                val tokenStr: String = account?.idToken ?: ""
+                val email = account?.email ?: "your Google account"
+                if (tokenStr.isNotBlank()) {
                     isGoogleLoading = true
-                    viewModel.signInWithGoogle(idToken) { authRes ->
+                    viewModel.signInWithGoogle(tokenStr) { authRes ->
                         isGoogleLoading = false
                         authRes.onSuccess {
                             Toast.makeText(context, "Welcome, ${it.name.ifBlank { email }}!", Toast.LENGTH_SHORT).show()
@@ -407,11 +408,13 @@ fun VoltaLoginCard(
                     errorMessage = null
                     viewModel.fetchGoogleClientId { clientId ->
                         try {
+                            @Suppress("DEPRECATION")
                             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                                 .requestIdToken(clientId)
                                 .requestEmail()
                                 .requestProfile()
                                 .build()
+                            @Suppress("DEPRECATION")
                             val client = GoogleSignIn.getClient(context, gso)
                             // Crucial: sign out from GoogleSignInClient first so cached account without ID token is invalidated
                             client.signOut().addOnCompleteListener {

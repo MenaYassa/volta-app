@@ -1,16 +1,16 @@
 [versions]
-agp = "9.1.1"
+agp = "9.4.1"
 kotlin = "2.2.10"
-coreKtx = "1.15.0"
-lifecycleRuntimeKtx = "2.8.7"
-activityCompose = "1.10.1"
-composeBom = "2024.09.00"
-navigationCompose = "2.8.9"
-material3 = "1.3.0"
-materialIconsExtended = "1.7.0"
-okhttp = "4.12.0"
-coroutines = "1.10.2"
-securityCrypto = "1.1.0-alpha06"
+coreKtx = "1.19.1"
+lifecycleRuntimeKtx = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2026.09.00"
+navigationCompose = "2.10.2"
+material3 = "1.4.0"
+materialIconsExtended = "1.7.8"
+okhttp = "5.5.0"
+coroutines = "1.11.0"
+securityCrypto = "1.1.0"
 playServicesAuth = "21.3.0"
 
 [libraries]
@@ -32,5 +32,4 @@ play-services-auth = { group = "com.google.android.gms", name = "play-services-a
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
