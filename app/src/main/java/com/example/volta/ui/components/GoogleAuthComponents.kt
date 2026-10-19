@@ -3,8 +3,11 @@ package com.example.volta.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.core.net.toUri
+import java.security.MessageDigest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -293,6 +296,37 @@ fun GoogleUserProfileCard(
     }
 }
 
+@Suppress("DEPRECATION")
+fun getAppSigningSha1(context: Context): String {
+    try {
+        val pm = context.packageManager
+        val packageName = context.packageName
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val packageInfo = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            packageInfo.signingInfo?.apkContentsSigners
+        } else {
+            val packageInfo = pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
+            packageInfo.signatures
+        }
+        if (!signatures.isNullOrEmpty()) {
+            val cert = signatures[0].toByteArray()
+            val md = MessageDigest.getInstance("SHA-1")
+            val digest = md.digest(cert)
+            val hexString = StringBuilder()
+            for (i in digest.indices) {
+                val hex = Integer.toHexString(0xFF and digest[i].toInt())
+                if (hex.length == 1) hexString.append('0')
+                hexString.append(hex)
+                if (i < digest.size - 1) hexString.append(':')
+            }
+            return hexString.toString().uppercase()
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("GoogleAuth", "Error computing SHA1: ${e.message}")
+    }
+    return GoogleAuthConfig.SHA1_FINGERPRINT
+}
+
 @Composable
 fun VoltaLoginCard(
     viewModel: VoltaViewModel,
@@ -300,6 +334,7 @@ fun VoltaLoginCard(
     onSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val activeSha1 = remember(context) { getAppSigningSha1(context) }
     val clipboardManager = LocalClipboardManager.current
     val settings by viewModel.settings.collectAsState()
     val coroutineScope = rememberCoroutineScope()
@@ -344,7 +379,7 @@ fun VoltaLoginCard(
                 val code = e.statusCode
                 if (code == 10 || code == 12500) {
                     showSha1Help = true
-                    errorMessage = "Google Play Services Error $code (Developer Configuration): Ensure Android Client ID (${GoogleAuthConfig.ANDROID_CLIENT_ID}) matches package '${context.packageName}' and SHA-1. You can use 'Sign In with Google (Web Direct)' below immediately without waiting."
+                    errorMessage = "Google Play Services Error $code (Developer Configuration): Ensure Android Client ID (${GoogleAuthConfig.ANDROID_CLIENT_ID}) matches package '${context.packageName}' and SHA-1 '$activeSha1'.\n\nYou can tap 'Sign In with Google (Web Direct)' below immediately to sign in without waiting."
                 } else if (code == 12501) {
                     // Canceled by user
                     errorMessage = null
@@ -506,7 +541,7 @@ fun VoltaLoginCard(
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 Text("Package: ${context.packageName}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                Text("SHA-1: ${GoogleAuthConfig.SHA1_FINGERPRINT}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Active SHA-1: $activeSha1", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("Android Client: ${GoogleAuthConfig.ANDROID_CLIENT_ID}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Text("Web Client: ${GoogleAuthConfig.WEB_CLIENT_ID}", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
@@ -519,7 +554,7 @@ fun VoltaLoginCard(
                             OutlinedButton(
                                 onClick = {
                                     clipboardManager.setText(
-                                        AnnotatedString("Package: ${context.packageName}\nSHA-1: ${GoogleAuthConfig.SHA1_FINGERPRINT}\nProject: ${GoogleAuthConfig.PROJECT_ID}")
+                                        AnnotatedString("Package: ${context.packageName}\nSHA-1: $activeSha1\nProject: ${GoogleAuthConfig.PROJECT_ID}")
                                     )
                                     Toast.makeText(context, "Credentials copied to clipboard!", Toast.LENGTH_SHORT).show()
                                 },
