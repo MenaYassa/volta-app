@@ -264,18 +264,19 @@ data class GoogleAuthResponse(
 )
 
 object GoogleAuthConfig {
-    const val WEB_CLIENT_ID = ""
-    const val ANDROID_CLIENT_ID = ""
+    const val WEB_CLIENT_ID = "345585205205-d2kn3jfdhahsq1ur4naclk97reojqptk.apps.googleusercontent.com"
+    const val ANDROID_CLIENT_ID = "345585205205-g9gnm704fkh7is0n1r33v6n4tk0teuja.apps.googleusercontent.com"
     const val PROJECT_ID = "volta-510610"
     const val CLIENT_SECRET = ""
     const val REDIRECT_URI = "https://volta.03092017.xyz"
     const val PACKAGE_NAME = "com.aistudio.volta.kxwz"
-    const val SHA1_FINGERPRINT = ""
+    const val SHA1_FINGERPRINT = "90:8E:F0:0C:3E:8D:10:65:0E:2F:12:7E:EE:5D:22:08:88:3D:18:79"
 
     fun getGoogleOAuthUrl(nonce: String = "volta_${System.currentTimeMillis()}"): String {
+        val cid = if (WEB_CLIENT_ID.isNotBlank()) WEB_CLIENT_ID else "345585205205-d2kn3jfdhahsq1ur4naclk97reojqptk.apps.googleusercontent.com"
         val encodedRedirect = java.net.URLEncoder.encode(REDIRECT_URI, "UTF-8")
         return "https://accounts.google.com/o/oauth2/v2/auth?" +
-                "client_id=$WEB_CLIENT_ID" +
+                "client_id=$cid" +
                 "&redirect_uri=$encodedRedirect" +
                 "&response_type=id_token" +
                 "&scope=openid%20email%20profile" +

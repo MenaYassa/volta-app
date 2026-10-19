@@ -1585,7 +1585,8 @@ class VoltaApiClient {
                 if (resp.isSuccessful) {
                     val body = resp.body?.string() ?: ""
                     val json = JSONObject(body)
-                    val clientId = json.optString("client_id", com.example.volta.model.GoogleAuthConfig.WEB_CLIENT_ID)
+                    val rawId = json.optString("client_id", "").ifBlank { json.optString("clientId", "") }
+                    val clientId = if (rawId.isNotBlank()) rawId else com.example.volta.model.GoogleAuthConfig.WEB_CLIENT_ID
                     Result.success(clientId)
                 } else {
                     Result.success(com.example.volta.model.GoogleAuthConfig.WEB_CLIENT_ID)

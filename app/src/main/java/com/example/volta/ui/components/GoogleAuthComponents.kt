@@ -408,9 +408,10 @@ fun VoltaLoginCard(
                     errorMessage = null
                     viewModel.fetchGoogleClientId { clientId ->
                         try {
+                            val effectiveClientId = if (clientId.isNotBlank()) clientId else GoogleAuthConfig.WEB_CLIENT_ID
                             @Suppress("DEPRECATION")
                             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                                .requestIdToken(clientId)
+                                .requestIdToken(effectiveClientId)
                                 .requestEmail()
                                 .requestProfile()
                                 .build()

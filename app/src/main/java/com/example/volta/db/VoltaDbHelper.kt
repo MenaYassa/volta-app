@@ -95,7 +95,7 @@ class VoltaDbHelper(private val context: Context) : SQLiteOpenHelper(context, DA
         db.execSQL(
             """
             CREATE TABLE settings (
-                key TEXT PRIMARY KEY,
+                `key` TEXT PRIMARY KEY,
                 value TEXT
             )
             """.trimIndent()
