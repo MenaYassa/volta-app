@@ -363,8 +363,7 @@ fun WebGoogleSignInDialog(
                                             webViewClient = object : WebViewClient() {
                                                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                                     val url = request?.url?.toString() ?: ""
-                                                    if (checkAndExtractAuthUrl(url)) return true
-                                                    return false
+                                                    return checkAndExtractAuthUrl(url)
                                                 }
 
                                                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -383,8 +382,7 @@ fun WebGoogleSignInDialog(
                                 webViewClient = object : WebViewClient() {
                                     override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                         val url = request?.url?.toString() ?: ""
-                                        if (checkAndExtractAuthUrl(url)) return true
-                                        return false
+                                        return checkAndExtractAuthUrl(url)
                                     }
 
                                     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {

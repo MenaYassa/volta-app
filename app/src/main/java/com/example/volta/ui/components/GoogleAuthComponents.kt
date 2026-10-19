@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
@@ -65,7 +64,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -88,7 +86,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import android.net.Uri
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalClipboardManager
 import kotlinx.coroutines.launch
 
 @Composable
@@ -288,7 +288,7 @@ fun GoogleUserProfileCard(
                     .fillMaxWidth()
                     .testTag("sign_out_button")
             ) {
-                Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Sign Out of Account", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }

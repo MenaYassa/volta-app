@@ -43,6 +43,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -68,6 +69,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -361,7 +363,7 @@ fun CreateTimerSheet(
                         label = { Text("Power Strip") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stripDropdownExpanded) },
                         modifier = Modifier
-                            .menuAnchor()
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                             .fillMaxWidth()
                             .testTag("timer_strip_selector"),
                         shape = RoundedCornerShape(12.dp)
@@ -699,7 +701,7 @@ fun CreateTimerSheet(
                             currentCycle = 0,
                             isRunning = true,
                             isPaused = false,
-                            currentPhaseOn = if (timerMode == TimerMode.CYCLIC) true else targetActionOn,
+                            currentPhaseOn = timerMode == TimerMode.CYCLIC || targetActionOn,
                             remainingSeconds = duration,
                             totalSecondsInPhase = duration,
                             startedAt = now,

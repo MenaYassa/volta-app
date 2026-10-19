@@ -480,7 +480,8 @@ fun SafetyGuardAlertBanner(
     val title = when {
         isOverheat -> "🔥 Overheat Emergency Shutdown (${guard.tripTempC ?: 65.0}°C)"
         guard.safeSince != null -> {
-            val elapsed = guard.safeSince?.let { ((System.currentTimeMillis() - it) / 1000).coerceAtLeast(0) } ?: 0L
+            val elapsed = guard.safeSince.let { ((System.currentTimeMillis() - it) / 1000).coerceAtLeast(0) }
+                ?: 0L
             val totalDelay = guard.safeDelayMin * 60
             "⏳ Grid Voltage Stabilizing (${elapsed}s / ${totalDelay}s)"
         }

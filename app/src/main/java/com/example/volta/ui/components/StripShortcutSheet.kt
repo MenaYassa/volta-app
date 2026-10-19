@@ -48,11 +48,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
@@ -244,45 +244,88 @@ fun StripShortcutSheet(
             Spacer(modifier = Modifier.height(14.dp))
 
             // TAB ROW
-            TabRow(
+            SecondaryTabRow(
                 selectedTabIndex = selectedTab,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .border(1.dp, VoltaSlateBorder, RoundedCornerShape(10.dp)),
                 containerColor = Color(0xFF1E293B),
                 contentColor = VoltaCyan,
-                indicator = { tabPositions ->
+                indicator = {
                     TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        modifier = Modifier.tabIndicatorOffset(selectedTab),
                         color = VoltaCyan
                     )
                 },
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(1.dp, VoltaSlateBorder, RoundedCornerShape(10.dp))
-            ) {
-                Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
-                    text = { Text("Properties", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null, modifier = Modifier.size(15.dp)) }
-                )
-                Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
-                    text = { Text("Diagnostics", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(15.dp)) }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text("Safety/Locks", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(15.dp)) }
-                )
-                Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
-                    text = { Text("Reboot", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) },
-                    icon = { Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp)) }
-                )
-            }
+                divider = { HorizontalDivider() },
+                tabs = {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = {
+                            Text(
+                                "Properties",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                Icons.Default.Home,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = {
+                            Text(
+                                "Diagnostics",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    )
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = { selectedTab = 2 },
+                        text = {
+                            Text(
+                                "Safety/Locks",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        icon = {
+                            Icon(
+                                Icons.Default.Security,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    )
+                    Tab(
+                        selected = selectedTab == 3,
+                        onClick = { selectedTab = 3 },
+                        text = { Text("Reboot", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) },
+                        icon = {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
+                    )
+                })
 
             Spacer(modifier = Modifier.height(14.dp))
 

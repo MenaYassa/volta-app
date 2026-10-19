@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
@@ -42,7 +43,6 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Visibility
@@ -144,9 +144,7 @@ fun SetupScreen(
 
     var hasNotifPermission by remember {
         mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else true
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
         )
     }
 
@@ -327,7 +325,8 @@ fun SetupScreen(
                                 IconButton(
                                     onClick = {
                                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        clipboard.setPrimaryClip(ClipData.newPlainText("Volta Account Token", userToken))
+                                        clipboard.setPrimaryClip(
+                                            ClipData.newPlainText("Volta Account Token", userToken))
                                         Toast.makeText(context, "Google account token copied to clipboard!", Toast.LENGTH_SHORT).show()
                                     },
                                     modifier = Modifier.size(30.dp).testTag("copy_token_button")
@@ -587,7 +586,8 @@ fun SetupScreen(
                                             IconButton(
                                                 onClick = {
                                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                                    clipboard.setPrimaryClip(ClipData.newPlainText("Strip Password", ap.password))
+                                                    clipboard.setPrimaryClip(
+                                                        ClipData.newPlainText("Strip Password", ap.password))
                                                     Toast.makeText(context, "Password '${ap.password}' copied!", Toast.LENGTH_SHORT).show()
                                                 },
                                                 modifier = Modifier.size(34.dp)
@@ -699,7 +699,8 @@ fun SetupScreen(
                         OutlinedButton(
                             onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("Strip Password", derivedPass))
+                                clipboard.setPrimaryClip(
+                                    ClipData.newPlainText("Strip Password", derivedPass))
                                 Toast.makeText(context, "Password '$derivedPass' copied to clipboard!", Toast.LENGTH_SHORT).show()
                             },
                             enabled = directInput.isNotBlank(),
@@ -924,7 +925,7 @@ fun SetupScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Executing Handshake & Auto-Claim…")
                         } else {
-                            Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(16.dp))
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send", modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Execute Pairing Handshake")
                         }

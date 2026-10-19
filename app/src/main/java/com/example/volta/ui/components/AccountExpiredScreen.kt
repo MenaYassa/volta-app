@@ -17,10 +17,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContactSupport
+import androidx.compose.material.icons.automirrored.filled.ContactSupport
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Router
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -83,7 +83,7 @@ fun AccountExpiredScreen(
     if (showContactDialog) {
         AlertDialog(
             onDismissRequest = { showContactDialog = false },
-            icon = { Icon(Icons.Default.ContactSupport, contentDescription = null, tint = VoltaBlue) },
+            icon = { Icon(Icons.AutoMirrored.Filled.ContactSupport, contentDescription = null, tint = VoltaBlue) },
             title = { Text("Contact Administrator", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -310,7 +310,7 @@ fun AccountExpiredScreen(
                         .testTag("contact_admin_button"),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Icon(Icons.Default.ContactSupport, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.AutoMirrored.Filled.ContactSupport, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Contact Administrator to Renew")
                 }
@@ -338,7 +338,7 @@ fun AccountExpiredScreen(
                         .fillMaxWidth()
                         .testTag("sign_out_lock_button")
                 ) {
-                    Icon(Icons.Default.Logout, contentDescription = null, tint = VoltaRed, modifier = Modifier.size(16.dp))
+                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = VoltaRed, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Sign Out of Account", color = VoltaRed, fontWeight = FontWeight.SemiBold)
                 }

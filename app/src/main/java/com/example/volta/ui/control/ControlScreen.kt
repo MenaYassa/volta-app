@@ -982,7 +982,7 @@ fun SlickPowerStripCard(
     onRequestDelete: () -> Unit = {},
     onOpenShortcutDrawer: () -> Unit = {}
 ) {
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val haptic = LocalHapticFeedback.current
     var isExpanded by remember(allExpanded) { mutableStateOf(allExpanded) }
     val cleanMac = strip.mac.replace(":", "").uppercase()
     val maxTemp = strip.outlets.maxOfOrNull { it.tempC } ?: 28

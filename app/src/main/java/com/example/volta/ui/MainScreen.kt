@@ -27,12 +27,13 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
@@ -79,6 +80,7 @@ enum class VoltaTab(val title: String, val icon: ImageVector) {
     SETTINGS("Settings", Icons.Default.Tune)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     viewModel: VoltaViewModel,
@@ -258,51 +260,53 @@ fun MainScreen(
                         }
 
                         // Compact, Professional Navigation Tab Row
-                        ScrollableTabRow(
+                        SecondaryScrollableTabRow(
                             selectedTabIndex = selectedTabIndex,
+                            modifier = Modifier.height(42.dp),
                             containerColor = Color.Transparent,
                             contentColor = Color.White,
                             edgePadding = 12.dp,
+                            indicator = {
+                                TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(selectedTabIndex),
+                                    height = 2.5.dp,
+                                    color = VoltaBlue
+                                )
+                            },
                             divider = {},
-                            indicator = { tabPositions ->
-                                if (selectedTabIndex < tabPositions.size) {
-                                    TabRowDefaults.SecondaryIndicator(
-                                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
-                                        height = 2.5.dp,
-                                        color = VoltaBlue
+                            tabs = {
+                                VoltaTab.values().forEachIndexed { index, tab ->
+                                    val isSelected = selectedTabIndex == index
+                                    Tab(
+                                        selected = isSelected,
+                                        onClick = { viewModel.setSelectedTab(index) },
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = tab.icon,
+                                                    contentDescription = tab.title,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = if (isSelected) Color.White else Color(
+                                                        0xFF94A3B8
+                                                    )
+                                                )
+                                                Text(
+                                                    text = tab.title,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) Color.White else Color(
+                                                        0xFF94A3B8
+                                                    )
+                                                )
+                                            }
+                                        },
+                                        modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
                                     )
                                 }
-                            },
-                            modifier = Modifier.height(42.dp)
-                        ) {
-                            VoltaTab.values().forEachIndexed { index, tab ->
-                                val isSelected = selectedTabIndex == index
-                                Tab(
-                                    selected = isSelected,
-                                    onClick = { viewModel.setSelectedTab(index) },
-                                    text = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = tab.icon,
-                                                contentDescription = tab.title,
-                                                modifier = Modifier.size(14.dp),
-                                                tint = if (isSelected) Color.White else Color(0xFF94A3B8)
-                                            )
-                                            Text(
-                                                text = tab.title,
-                                                fontSize = 13.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) Color.White else Color(0xFF94A3B8)
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.testTag("tab_${tab.name.lowercase()}")
-                                )
-                            }
-                        }
+                            })
 
                         // Security Auth Banner if Token Missing or 401 Unauthorized (unless expired lock screen is active)
                         val isAccountExpired = !settings.isStandalone && whoAmI != null && (whoAmI?.subscriptionExpired == true || whoAmI?.status == "expired" || whoAmI?.status == "canceled")
