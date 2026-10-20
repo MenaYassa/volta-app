@@ -5,6 +5,7 @@ import com.example.volta.model.CitySearchResult
 import com.example.volta.model.Outlet
 import com.example.volta.model.OutletTimer
 import com.example.volta.model.PowerStrip
+import com.example.volta.model.Schedule
 import com.example.volta.model.SunInfo
 import com.example.volta.model.TelemetryPoint
 import com.example.volta.model.TimerMode
@@ -1571,6 +1572,125 @@ class VoltaApiClient {
             client.newCall(reqBuilder.build()).execute().use { resp ->
                 if (resp.isSuccessful) Result.success(true)
                 else Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchSchedules(baseUrl: String, token: String, homeId: String? = null): Result<List<Schedule>> = withContext(Dispatchers.IO) {
+        try {
+            val url = if (!homeId.isNullOrBlank() && homeId != "__all__") {
+                "${baseUrl.trimEnd('/')}/api/schedules?home_id=${java.net.URLEncoder.encode(homeId, "UTF-8")}"
+            } else {
+                "${baseUrl.trimEnd('/')}/api/schedules"
+            }
+            val reqBuilder = Request.Builder().url(url)
+            addAuthHeaders(reqBuilder, token)
+
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+                val body = resp.body?.string() ?: return@withContext Result.failure(Exception("Empty body"))
+                val json = JSONObject(body)
+                val schedArray = json.optJSONArray("schedules") ?: json.optJSONArray("data") ?: JSONArray()
+                val list = mutableListOf<Schedule>()
+                for (i in 0 until schedArray.length()) {
+                    val sObj = schedArray.getJSONObject(i)
+                    val id = sObj.optString("id", java.util.UUID.randomUUID().toString())
+                    val mac = sObj.optString("mac")
+                    val outlet = sObj.optInt("outlet", 1)
+                    val on = sObj.optBoolean("on", true)
+                    val rawKind = sObj.optString("kind", "time").lowercase()
+                    val sun = sObj.optString("sun", "set").lowercase()
+                    val kind = if (rawKind == "sun") sun else "time"
+                    val time = sObj.optString("time", "23:00")
+                    val offsetMin = sObj.optInt("offset_min", 0)
+                    val daysJson = sObj.optJSONArray("days")
+                    val daysList = if (daysJson != null && daysJson.length() > 0) {
+                        val d = mutableListOf<Int>()
+                        for (j in 0 until daysJson.length()) d.add(daysJson.getInt(j))
+                        d
+                    } else {
+                        listOf(0, 1, 2, 3, 4, 5, 6)
+                    }
+                    val tz = sObj.optString("tz", "Africa/Cairo")
+                    val label = sObj.optString("label", "")
+                    val enabled = sObj.optBoolean("enabled", true)
+
+                    list.add(
+                        Schedule(
+                            id = id,
+                            stripMac = mac,
+                            outlet = outlet,
+                            actionOn = on,
+                            kind = kind,
+                            time = time,
+                            offsetMinutes = offsetMin,
+                            days = daysList,
+                            timezone = tz,
+                            label = label,
+                            enabled = enabled
+                        )
+                    )
+                }
+                Result.success(list)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createOrUpdateSchedule(baseUrl: String, token: String, schedule: Schedule): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/schedules"
+            val isSun = schedule.kind == "rise" || schedule.kind == "set"
+            val payload = JSONObject().apply {
+                put("id", schedule.id)
+                put("mac", schedule.stripMac)
+                put("outlet", schedule.outlet)
+                put("on", schedule.actionOn)
+                put("kind", if (isSun) "sun" else "time")
+                put("sun", if (isSun) schedule.kind else "set")
+                put("time", if (isSun) "" else schedule.time)
+                put("offset_min", schedule.offsetMinutes)
+                put("days", JSONArray(schedule.days))
+                put("tz", schedule.timezone)
+                put("label", schedule.label)
+                put("enabled", schedule.enabled)
+            }
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .post(payload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(reqBuilder, token)
+
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun deleteSchedule(baseUrl: String, token: String, scheduleId: String): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val url = "${baseUrl.trimEnd('/')}/api/schedules?id=${java.net.URLEncoder.encode(scheduleId, "UTF-8")}"
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .delete()
+            addAuthHeaders(reqBuilder, token)
+
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

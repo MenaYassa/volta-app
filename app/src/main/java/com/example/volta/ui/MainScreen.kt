@@ -57,7 +57,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import com.example.volta.theme.VoltaBlue
+import com.example.volta.theme.VoltaCyan
+import com.example.volta.theme.VoltaGreen
+import com.example.volta.theme.VoltaGreenBright
 import com.example.volta.theme.VoltaGreen
 import com.example.volta.theme.VoltaNavy
 import com.example.volta.theme.VoltaRed
@@ -103,23 +108,23 @@ fun MainScreen(
             .removePrefix("http://")
             .removePrefix("https://")
             .trimEnd('/')
-        if (cleanUrl.isNotBlank()) "Server • $cleanUrl" else "Gateway Offline"
+        if (cleanUrl.isNotBlank()) cleanUrl else "Offline"
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
-            // Streamlined, Compact Professional Header
+            // Modernized Glassmorphic Command Header
             Surface(
-                color = VoltaNavy,
-                shadowElevation = 4.dp
+                color = Color(0xFF0B132B),
+                shadowElevation = 8.dp
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(VoltaNavy, Color(0xFF0F2347))
+                                colors = listOf(Color(0xFF0B132B), Color(0xFF141F38), Color(0xFF0F172A))
                             )
                         )
                         .statusBarsPadding()
@@ -127,134 +132,179 @@ fun MainScreen(
                     Column(
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Compact Top Title Bar (No overlap, smaller height)
+                        // Top Brand, Fleet Status & Profile Action Row
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // Left Column: Brand name + Connected server under it
-                            Column(
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.weight(1f)
+                            // Left Brand Block with Glowing Icon & Gateway Badge
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .background(Color(0x2638BDF8), CircleShape)
+                                        .border(1.5.dp, VoltaCyan.copy(alpha = 0.6f), CircleShape),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = "⚡",
-                                        fontSize = 17.sp
-                                    )
-                                    Text(
-                                        text = "VOLTA",
-                                        fontSize = 17.sp,
-                                        fontWeight = FontWeight.Black,
-                                        letterSpacing = 1.2.sp,
-                                        color = Color.White
+                                    Icon(
+                                        imageVector = Icons.Default.PowerSettingsNew,
+                                        contentDescription = null,
+                                        tint = VoltaCyan,
+                                        modifier = Modifier.size(19.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(2.dp))
-
-                                // Connected server status placed directly UNDER Volta name
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    StatusDot(
-                                        isOnline = if (settings.isStandalone) onlineCount > 0 else (onlineCount > 0 || settings.serverUrl.isNotBlank()),
-                                        modifier = Modifier.size(7.dp)
-                                    )
-                                    Text(
-                                        text = serverSubtitle,
-                                        fontSize = 11.sp,
-                                        color = Color(0xFF94A3B8),
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                Column {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "VOLTA",
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 1.2.sp,
+                                            color = Color.White
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(99.dp),
+                                            color = Color(0x1A38BDF8),
+                                            border = BorderStroke(1.dp, Color(0x3338BDF8))
+                                        ) {
+                                            Text(
+                                                text = if (settings.isStandalone) "LOCAL" else "CLOUD",
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = VoltaCyan,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.5.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(1.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(5.dp)
+                                    ) {
+                                        StatusDot(
+                                            isOnline = if (settings.isStandalone) onlineCount > 0 else (onlineCount > 0 || settings.serverUrl.isNotBlank()),
+                                            modifier = Modifier.size(6.5.dp)
+                                        )
+                                        Text(
+                                            text = serverSubtitle,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF94A3B8),
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
 
-                            // Right Action Controls: Devices Count Pill & Settings Button
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            // Right Controls: Pill Fleet Badge, Avatar & Quick Actions
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // Connected devices count pill
-                                Box(
-                                    modifier = Modifier
-                                        .background(Color.White.copy(alpha = 0.09f), RoundedCornerShape(14.dp))
-                                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                                // Dynamic Fleet Live Pill
+                                Surface(
+                                    shape = RoundedCornerShape(99.dp),
+                                    color = if (onlineCount > 0) Color(0x1F22C55E) else Color(0x1AE2E8F0),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (onlineCount > 0) Color(0x4D22C55E) else Color(0x26E2E8F0)
+                                    )
                                 ) {
                                     Row(
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(6.dp)
-                                                .background(if (onlineCount > 0) VoltaGreen else Color(0xFF64748B), CircleShape)
+                                                .size(6.5.dp)
+                                                .background(
+                                                    if (onlineCount > 0) VoltaGreenBright else Color(0xFF64748B),
+                                                    CircleShape
+                                                )
                                         )
                                         Text(
                                             text = "$onlineCount/$totalCount live",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White
-                                        )
-                                    }
-                                }
-
-                                // User Profile / Google avatar indicator if authenticated
-                                if (!settings.isStandalone && whoAmI != null && whoAmI?.authorized == true) {
-                                    val initials = if (whoAmI?.name.orEmpty().isNotBlank()) {
-                                        whoAmI?.name.orEmpty().split(" ")
-                                            .filter { it.isNotBlank() }
-                                            .take(2)
-                                            .map { it.first().uppercaseChar() }
-                                            .joinToString("")
-                                    } else if (whoAmI?.email.orEmpty().isNotBlank()) {
-                                        whoAmI?.email.orEmpty().take(2).uppercase()
-                                    } else "V"
-
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(VoltaBlue.copy(alpha = 0.25f), CircleShape)
-                                            .clickable { viewModel.setSelectedTab(VoltaTab.SETTINGS.ordinal) }
-                                            .testTag("top_user_profile_avatar")
-                                    ) {
-                                        Text(
-                                            text = initials,
+                                            fontSize = 11.5.sp,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            color = Color.White
+                                            color = if (onlineCount > 0) Color.White else Color(0xFF94A3B8),
+                                            softWrap = false,
+                                            maxLines = 1
                                         )
                                     }
                                 }
 
-                                // Quick Settings Button (Theme toggle moved inside Settings)
-                                IconButton(
-                                    onClick = { viewModel.setSelectedTab(VoltaTab.SETTINGS.ordinal) },
+                                // Interactive Profile Avatar
+                                val initials = if (whoAmI != null && whoAmI?.name.orEmpty().isNotBlank()) {
+                                    whoAmI?.name.orEmpty().split(" ")
+                                        .filter { it.isNotBlank() }
+                                        .take(2)
+                                        .map { it.first().uppercaseChar() }
+                                        .joinToString("")
+                                } else if (whoAmI != null && whoAmI?.email.orEmpty().isNotBlank()) {
+                                    whoAmI?.email.orEmpty().take(2).uppercase()
+                                } else "U"
+
+                                Box(
+                                    contentAlignment = Alignment.Center,
                                     modifier = Modifier
-                                        .size(34.dp)
+                                        .size(36.dp)
                                         .background(
-                                            if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) VoltaBlue.copy(alpha = 0.25f)
-                                            else Color.White.copy(alpha = 0.09f),
+                                            Brush.linearGradient(
+                                                colors = listOf(Color(0xFF2563EB), Color(0xFF1D4ED8))
+                                            ),
                                             CircleShape
                                         )
+                                        .border(1.5.dp, Color(0x6638BDF8), CircleShape)
+                                        .clickable {
+                                            if (authRequired) showSignInDialog = true
+                                            else viewModel.setSelectedTab(VoltaTab.SETTINGS.ordinal)
+                                        }
+                                        .testTag("top_user_profile_avatar")
+                                ) {
+                                    Text(
+                                        text = initials,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                        color = Color.White
+                                    )
+                                }
+
+                                // Quick Settings Shortcut
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) Color(0x332563EB) else Color(0x1FFFFFFF),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) VoltaBlue else Color(0x26FFFFFF)
+                                    ),
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clickable { viewModel.setSelectedTab(VoltaTab.SETTINGS.ordinal) }
                                         .testTag("top_settings_button")
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "Settings",
-                                        tint = if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) VoltaBlue else Color(0xFFCBD5E1),
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Settings,
+                                            contentDescription = "Settings",
+                                            tint = if (selectedTabIndex == VoltaTab.SETTINGS.ordinal) VoltaCyan else Color(0xFFE2E8F0),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -428,17 +478,28 @@ fun MainScreen(
                 modifier = Modifier.padding(innerPadding)
             )
         } else {
-            Box(
+            androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                when (VoltaTab.values()[selectedTabIndex.coerceIn(0, VoltaTab.values().size - 1)]) {
-                    VoltaTab.CONTROL -> ControlScreen(viewModel)
-                    VoltaTab.ANALYTICS -> AnalyticsScreen(viewModel)
-                    VoltaTab.SCHEDULES -> SchedulesScreen(viewModel)
-                    VoltaTab.SETUP -> SetupScreen(viewModel)
-                    VoltaTab.SETTINGS -> SettingsScreen(viewModel)
+                val isWide = maxWidth >= 840.dp
+                val contentModifier = if (isWide) {
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = (maxWidth - 840.dp) / 2)
+                } else {
+                    Modifier.fillMaxSize()
+                }
+
+                Box(modifier = contentModifier) {
+                    when (VoltaTab.values()[selectedTabIndex.coerceIn(0, VoltaTab.values().size - 1)]) {
+                        VoltaTab.CONTROL -> ControlScreen(viewModel)
+                        VoltaTab.ANALYTICS -> AnalyticsScreen(viewModel)
+                        VoltaTab.SCHEDULES -> SchedulesScreen(viewModel)
+                        VoltaTab.SETUP -> SetupScreen(viewModel)
+                        VoltaTab.SETTINGS -> SettingsScreen(viewModel)
+                    }
                 }
             }
         }

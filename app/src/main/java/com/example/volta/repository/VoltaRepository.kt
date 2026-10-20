@@ -434,6 +434,15 @@ class VoltaRepository(private val context: Context) {
                 }
             }
 
+            // Sync schedules from server
+            val schedulesResult = apiClient.fetchSchedules(s.serverUrl, s.serverToken)
+            schedulesResult.onSuccess { remoteSchedules ->
+                _schedules.value = remoteSchedules
+                for (sch in remoteSchedules) {
+                    dbHelper.upsertSchedule(sch)
+                }
+            }
+
             // Sync user homes
             val homesResult = apiClient.fetchHomes(s.serverUrl, s.serverToken)
             homesResult.onSuccess { remoteHomes ->
@@ -771,19 +780,58 @@ class VoltaRepository(private val context: Context) {
 
     // Schedules
     suspend fun addSchedule(schedule: Schedule) = withContext(Dispatchers.IO) {
+        val s = _settings.value
+        if (s.serverUrl.isNotBlank()) {
+            val apiRes = apiClient.createOrUpdateSchedule(s.serverUrl, s.serverToken, schedule)
+            if (apiRes.isSuccess) {
+                addLog("SYS", schedule.stripMac, "Server schedule created: ${schedule.label.ifBlank { schedule.time }}")
+                val refreshed = apiClient.fetchSchedules(s.serverUrl, s.serverToken)
+                if (refreshed.isSuccess) {
+                    val remoteList = refreshed.getOrNull()
+                    if (!remoteList.isNullOrEmpty()) {
+                        _schedules.value = remoteList
+                        for (sch in remoteList) dbHelper.upsertSchedule(sch)
+                        return@withContext
+                    }
+                }
+            }
+        }
         dbHelper.upsertSchedule(schedule)
         _schedules.value = dbHelper.getAllSchedules()
         addLog("SYS", schedule.stripMac, "Schedule '${schedule.label.ifBlank { schedule.time }}' created.")
     }
 
     suspend fun toggleSchedule(id: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+        val schedule = _schedules.value.find { it.id == id }
+        val s = _settings.value
+        if (s.serverUrl.isNotBlank() && schedule != null) {
+            val updated = schedule.copy(enabled = enabled)
+            apiClient.createOrUpdateSchedule(s.serverUrl, s.serverToken, updated)
+            val refreshed = apiClient.fetchSchedules(s.serverUrl, s.serverToken)
+            if (refreshed.isSuccess) {
+                val remoteList = refreshed.getOrNull()
+                if (!remoteList.isNullOrEmpty()) {
+                    _schedules.value = remoteList
+                    for (sch in remoteList) dbHelper.upsertSchedule(sch)
+                    return@withContext
+                }
+            }
+        }
         dbHelper.toggleSchedule(id, enabled)
         _schedules.value = dbHelper.getAllSchedules()
     }
 
     suspend fun deleteSchedule(id: String) = withContext(Dispatchers.IO) {
+        val schedule = _schedules.value.find { it.id == id }
+        val s = _settings.value
+        if (s.serverUrl.isNotBlank()) {
+            apiClient.deleteSchedule(s.serverUrl, s.serverToken, id)
+        }
         dbHelper.deleteSchedule(id)
-        _schedules.value = dbHelper.getAllSchedules()
+        _schedules.value = _schedules.value.filterNot { it.id == id }
+        if (schedule != null) {
+            addLog("SYS", schedule.stripMac, "Schedule removed: ${schedule.label.ifBlank { schedule.time }}")
+        }
     }
 
     // Timer Loop & Execution Engine

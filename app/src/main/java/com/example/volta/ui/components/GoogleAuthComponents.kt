@@ -199,7 +199,7 @@ fun GoogleUserProfileCard(
                         )
                     }
 
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -231,10 +231,12 @@ fun GoogleUserProfileCard(
                     }
                 }
 
+                Spacer(modifier = Modifier.width(6.dp))
+
                 // Plan Tier Badge
                 val isLifetime = whoAmI.expiresAt == null
                 TagBadge(
-                    text = if (isLifetime) "Lifetime / Free Tier" else if (whoAmI.subscriptionExpired) "Expired" else "Active Tier",
+                    text = if (isLifetime) "Lifetime Tier" else if (whoAmI.subscriptionExpired) "Expired" else "Active Tier",
                     color = if (isLifetime) VoltaGreen else if (whoAmI.subscriptionExpired) VoltaRed else VoltaBlue
                 )
             }
@@ -251,7 +253,8 @@ fun GoogleUserProfileCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f, fill = false)
                 ) {
                     Icon(Icons.Default.Dns, contentDescription = null, tint = VoltaBlue, modifier = Modifier.size(16.dp))
                     Text(
@@ -262,16 +265,20 @@ fun GoogleUserProfileCard(
                     Text(
                         text = "${whoAmI.strips.size} of ${whoAmI.maxStrips} allocated",
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
                     )
                 }
 
                 if (whoAmI.expiresAt == null) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "✓ 1 Free Lifetime Strip",
                         fontSize = 11.sp,
                         color = VoltaGreen,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }

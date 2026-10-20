@@ -420,16 +420,16 @@ fun AnalyticsScreen(
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                border = BorderStroke(1.dp, Color(0x333B82F6))
+                border = BorderStroke(1.dp, Color(0x3338BDF8))
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
                             Brush.linearGradient(
-                                colors = listOf(Color(0xFF0F172A), Color(0xFF1E3A8A))
+                                colors = listOf(Color(0xFF0B132B), Color(0xFF1C2541), Color(0xFF0F172A))
                             )
                         )
                         .padding(18.dp)
@@ -491,34 +491,40 @@ fun AnalyticsScreen(
 
                                     // Compact telemetry sub-bar
                                     Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = Color(0x0DFFFFFF),
-                                        border = BorderStroke(1.dp, Color(0x14FFFFFF)),
+                                        shape = RoundedCornerShape(99.dp),
+                                        color = Color(0x26000000),
+                                        border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                .padding(horizontal = 12.dp, vertical = 7.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
                                             Text(
                                                 text = "🔌 ${String.format(Locale.US, "%.1f", displayVoltage)}V",
-                                                fontSize = 11.sp,
+                                                fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF60A5FA)
+                                                color = Color(0xFF60A5FA),
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                             Text(
                                                 text = "🌡️ ${String.format(Locale.US, "%.0f", avgTemp)}°C",
-                                                fontSize = 11.sp,
+                                                fontSize = 11.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color(0xFFF87171)
+                                                color = Color(0xFFF87171),
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                             Text(
                                                 text = "${homeFilteredStrips.count { it.online }}/${homeFilteredStrips.size} live",
-                                                fontSize = 11.sp,
-                                                color = Color(0xFFCBD5E1)
+                                                fontSize = 11.5.sp,
+                                                color = Color(0xFFCBD5E1),
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                         }
                                     }
@@ -585,13 +591,13 @@ fun AnalyticsScreen(
 
                                     // Right mini-telemetry card
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = Color(0x0DFFFFFF),
-                                        border = BorderStroke(1.dp, Color(0x14FFFFFF)),
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = Color(0x26000000),
+                                        border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                                         modifier = Modifier.padding(start = 6.dp)
                                     ) {
                                         Column(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
                                             horizontalAlignment = Alignment.End
                                         ) {
                                             Row(
@@ -607,10 +613,12 @@ fun AnalyticsScreen(
                                                     text = "${String.format(Locale.US, "%.1f", displayVoltage)}V",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFF60A5FA)
+                                                    color = Color(0xFF60A5FA),
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Spacer(modifier = Modifier.height(3.dp))
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -624,14 +632,18 @@ fun AnalyticsScreen(
                                                     text = "${String.format(Locale.US, "%.0f", avgTemp)}°C",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color(0xFFF87171)
+                                                    color = Color(0xFFF87171),
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             }
-                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Spacer(modifier = Modifier.height(3.dp))
                                             Text(
                                                 text = "updated ${timeFormat.format(Date(liveTick))}",
                                                 fontSize = 10.sp,
-                                                color = Color(0xFF94A3B8)
+                                                color = Color(0xFF94A3B8),
+                                                maxLines = 1,
+                                                softWrap = false
                                             )
                                         }
                                     }

@@ -626,9 +626,9 @@ fun UnifiedOverviewCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = VoltaSlateCard),
-        border = BorderStroke(1.dp, VoltaSlateBorder)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF131C31)),
+        border = BorderStroke(1.dp, Color(0x3338BDF8))
     ) {
         Column(
             modifier = Modifier
@@ -638,230 +638,170 @@ fun UnifiedOverviewCard(
                         colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
                     )
                 )
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(16.dp)
         ) {
-            // =========================================================================
-            // 1. CARD TITLE ROW (Prominent "TOTAL HOUSEHOLD LOAD" as Card Title)
-            // =========================================================================
+            // Top Section: SFN Radial Ring Gauge on Left + Live Watts & Status on Right
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Card Title + Fleet Subtitle
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .background(Color(0x3338BDF8), CircleShape)
-                            .border(1.dp, VoltaCyan.copy(alpha = 0.5f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bolt,
-                            contentDescription = null,
-                            tint = VoltaCyan,
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
+                // SFN Radial Ring Gauge
+                UnifiedRadialRing(
+                    totalWatts = totalLoadW,
+                    onlineRatioText = "$onlineStripsCount/$totalStripsCount",
+                    size = 84.dp
+                )
 
-                    Column {
+                // Power readouts & Household Title
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "TOTAL HOUSEHOLD LOAD",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                        color = Color(0xFF94A3B8),
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "TOTAL HOUSEHOLD LOAD",
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.8.sp,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = String.format(Locale.US, "%.1f", totalLoadW),
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = (-0.5).sp,
+                            color = Color.White
                         )
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "${totalStripsCount} strips · ${activeOutletsCount}/${totalOutletsCount} active · $lastUpdateText",
-                            fontSize = 10.sp,
-                            color = Color(0xFF94A3B8),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                // Actions: Expand/Collapse All toggle & Quick Refresh
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    // Expand / Collapse All Toggle Button
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = VoltaSlateSubCard,
-                        border = BorderStroke(1.dp, VoltaSlateBorder),
-                        modifier = Modifier
-                            .clickable { onToggleExpandAll() }
-                            .testTag("toggle_expand_all_button")
-                    ) {
-                        Text(
-                            text = if (allExpanded) "Collapse" else "Expand All",
-                            fontSize = 10.5.sp,
+                            text = "W",
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                            color = Color(0xFF38BDF8),
+                            modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
-
-                    // Quick Refresh Button
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = VoltaSlateSubCard,
-                        border = BorderStroke(1.dp, VoltaSlateBorder),
-                        modifier = Modifier
-                            .clickable { onRefresh() }
-                            .testTag("refresh_now_button")
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Refresh",
-                                tint = VoltaCyan,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Text(
-                                text = "Refresh",
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = VoltaCyan
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Active Live Stream · $lastUpdateText",
+                        fontSize = 11.sp,
+                        color = Color(0xFFCBD5E1),
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = VoltaSlateBorder.copy(alpha = 0.35f), thickness = 1.dp)
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 1.dp)
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // =========================================================================
-            // 2. MAIN BODY: Radial Gauge in Center, Data Distributed Around It
-            // =========================================================================
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val gaugeSize = if (maxWidth < 340.dp) 70.dp else 80.dp
+            // 4 Column Grid matching web .unified-kpis-wrap
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                UnifiedKpiCol(
+                    label = "🔌 Total Strips",
+                    value = "$totalStripsCount",
+                    sub = "Fleet capacity",
+                    valueColor = Color.White,
+                    modifier = Modifier.weight(1f)
+                )
+                UnifiedKpiCol(
+                    label = "🟢 Connected",
+                    value = "$onlineStripsCount",
+                    sub = "Online now",
+                    valueColor = VoltaGreenBright,
+                    modifier = Modifier.weight(1f)
+                )
+                UnifiedKpiCol(
+                    label = "⚡ Outlets",
+                    value = "$activeOutletsCount",
+                    sub = "of $totalOutletsCount ON",
+                    valueColor = VoltaCyan,
+                    modifier = Modifier.weight(1f)
+                )
+                UnifiedKpiCol(
+                    label = "🛡️ Protection",
+                    value = if (anyGuardTripped) "TRIPPED" else "Armed",
+                    sub = if (anyGuardTripped) "Isolated" else "Dual Safety",
+                    valueColor = if (anyGuardTripped) VoltaRed else Color(0xFF38BDF8),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+
+    // Actions Row directly under Hero Card matching web app
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = VoltaSlateCard,
+                border = BorderStroke(1.dp, VoltaSlateBorder),
+                modifier = Modifier.clickable { onRefresh() }.testTag("refresh_now_button")
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // LEFT COLUMN: Fleet Strips & Connection Status (Distributed left of circle)
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        KpiTile(
-                            icon = "🔌",
-                            label = "Total Strips",
-                            value = "$totalStripsCount",
-                            subtext = "$onlineStripsCount live",
-                            valueColor = Color.White,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        KpiTile(
-                            icon = "🟢",
-                            label = "Connected",
-                            value = "$onlineStripsCount",
-                            subtext = if (onlineStripsCount == totalStripsCount && totalStripsCount > 0) "All online" else "${totalStripsCount - onlineStripsCount} offline",
-                            valueColor = VoltaGreenBright,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    // Left Hardware Vertical Divider
-                    Box(
-                        modifier = Modifier
-                            .height(54.dp)
-                            .width(1.dp)
-                            .background(VoltaSlateBorder.copy(alpha = 0.5f))
-                    )
-
-                    // CENTER: LIVE RADIAL POWER GAUGE (Prominently in the middle)
-                    Box(
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        RadialPowerGauge(
-                            totalWatts = totalLoadW,
-                            onlineRatioText = "$onlineStripsCount/$totalStripsCount strips live",
-                            gaugeSize = gaugeSize
-                        )
-                    }
-
-                    // Right Hardware Vertical Divider
-                    Box(
-                        modifier = Modifier
-                            .height(54.dp)
-                            .width(1.dp)
-                            .background(VoltaSlateBorder.copy(alpha = 0.5f))
-                    )
-
-                    // RIGHT COLUMN: Active Outlets & Safety Guard (Distributed right of circle)
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        KpiTile(
-                            icon = "⚡",
-                            label = "Active Outlets",
-                            value = "$activeOutletsCount",
-                            subtext = "$activeOutletsCount of $totalOutletsCount active",
-                            valueColor = VoltaCyan,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        KpiTile(
-                            icon = "🛡️",
-                            label = "Protection",
-                            value = if (anyGuardTripped) "TRIPPED" else "Armed",
-                            subtext = if (anyGuardTripped) "Fault isolated" else "Dual Safety Active",
-                            valueColor = if (anyGuardTripped) VoltaRed else Color(0xFF38BDF8),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = VoltaCyan, modifier = Modifier.size(13.dp))
+                    Text("Refresh", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = VoltaCyan)
                 }
             }
+            Text("Updated $lastUpdateText", fontSize = 11.sp, color = Color(0xFF64748B))
+        }
+
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = VoltaSlateCard,
+            border = BorderStroke(1.dp, VoltaSlateBorder),
+            modifier = Modifier.clickable { onToggleExpandAll() }.testTag("toggle_expand_all_button")
+        ) {
+            Text(
+                text = if (allExpanded) "Hide Outlets" else "Show All Outlets",
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
         }
     }
 }
 
 @Composable
-fun RadialPowerGauge(
+fun UnifiedRadialRing(
     totalWatts: Double,
     onlineRatioText: String,
     modifier: Modifier = Modifier,
     maxWatts: Float = 3520f,
-    gaugeSize: Dp = 76.dp
+    size: Dp = 84.dp
 ) {
     Box(
-        modifier = modifier.size(gaugeSize),
+        modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
         val pct = (totalWatts.toFloat() / maxWatts).coerceIn(0f, 1f)
         val sweepAngle = 360f * pct
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 6.dp.toPx()
-            val diameter = size.minDimension - strokeWidth
+            val strokeWidth = 6.5.dp.toPx()
+            val diameter = size.toPx() - strokeWidth
             val topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
             val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
 
-            // Background circle track
+            // Track circle
             drawArc(
                 color = Color.White.copy(alpha = 0.08f),
                 startAngle = 0f,
@@ -872,7 +812,7 @@ fun RadialPowerGauge(
                 style = Stroke(width = strokeWidth)
             )
 
-            // Radial progress arc
+            // Progress arc
             if (sweepAngle > 0f) {
                 drawArc(
                     brush = Brush.sweepGradient(
@@ -895,63 +835,58 @@ fun RadialPowerGauge(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = String.format(Locale.US, "%.1f W", totalWatts),
-                fontSize = if (gaugeSize < 75.dp) 12.5.sp else 13.5.sp,
+                text = String.format(Locale.US, "%.0f W", totalWatts),
+                fontSize = 14.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                softWrap = false
             )
             Text(
-                text = onlineRatioText,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.SemiBold,
+                text = "Fleet Load",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
                 color = Color(0xFF94A3B8),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                softWrap = false
             )
         }
     }
 }
 
 @Composable
-private fun KpiTile(
-    icon: String,
+private fun UnifiedKpiCol(
     label: String,
     value: String,
-    subtext: String,
-    modifier: Modifier = Modifier,
-    valueColor: Color = Color.White
+    sub: String,
+    valueColor: Color = Color.White,
+    modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(text = icon, fontSize = 10.sp)
-            Text(
-                text = label,
-                fontSize = 9.5.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF94A3B8),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
         Text(
-            text = value,
-            fontSize = 14.5.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = valueColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = subtext,
-            fontSize = 9.sp,
+            text = label,
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.SemiBold,
             color = Color(0xFF94A3B8),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            softWrap = false
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Black,
+            color = valueColor,
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(modifier = Modifier.height(1.dp))
+        Text(
+            text = sub,
+            fontSize = 9.sp,
+            color = Color(0xFF64748B),
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

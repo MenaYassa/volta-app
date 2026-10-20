@@ -133,6 +133,8 @@ fun TagBadge(
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = color,
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
         )
     }

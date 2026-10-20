@@ -48,6 +48,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -243,14 +244,15 @@ fun StripShortcutSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // TAB ROW
-            SecondaryTabRow(
+            // TAB ROW - Scrollable to prevent awkward text breaking and height enlargement
+            SecondaryScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .border(1.dp, VoltaSlateBorder, RoundedCornerShape(10.dp)),
                 containerColor = Color(0xFF1E293B),
                 contentColor = VoltaCyan,
+                edgePadding = 6.dp,
                 indicator = {
                     TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(selectedTab),
@@ -266,7 +268,9 @@ fun StripShortcutSheet(
                             Text(
                                 "Properties",
                                 fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         },
                         icon = {
@@ -284,7 +288,9 @@ fun StripShortcutSheet(
                             Text(
                                 "Diagnostics",
                                 fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         },
                         icon = {
@@ -300,9 +306,11 @@ fun StripShortcutSheet(
                         onClick = { selectedTab = 2 },
                         text = {
                             Text(
-                                "Safety/Locks",
+                                "Safety & Locks",
                                 fontSize = 11.5.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         },
                         icon = {
@@ -316,7 +324,15 @@ fun StripShortcutSheet(
                     Tab(
                         selected = selectedTab == 3,
                         onClick = { selectedTab = 3 },
-                        text = { Text("Reboot", fontSize = 11.5.sp, fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text(
+                                "Reboot",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        },
                         icon = {
                             Icon(
                                 Icons.Default.Refresh,
@@ -325,7 +341,8 @@ fun StripShortcutSheet(
                             )
                         }
                     )
-                })
+                }
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
 

@@ -1,6 +1,8 @@
 package com.example.volta.ui.schedules
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -23,9 +26,11 @@ import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,12 +48,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volta.theme.VoltaBlue
+import com.example.volta.theme.VoltaCyan
 import com.example.volta.theme.VoltaGreen
 import com.example.volta.theme.VoltaRed
 import com.example.volta.ui.components.HomeSwitcherBar
@@ -221,40 +228,118 @@ fun SchedulesScreen(
         }
 
         if (activeSubTab == 0) {
-            // ==================== DAILY SCHEDULES ====================
+            // ==================== DAILY SCHEDULES HERO ====================
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = CardDefaults.outlinedCardBorder()
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF131C31)),
+                    border = BorderStroke(1.dp, Color(0x3338BDF8))
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                                )
+                            )
+                            .padding(16.dp)
+                    ) {
+                        // Title + Count + Add Button Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(Color(0x2638BDF8), CircleShape)
+                                        .border(1.5.dp, VoltaCyan.copy(alpha = 0.5f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        tint = VoltaCyan,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Column {
+                                    Text(
+                                        text = "DAILY SCHEDULES",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp,
+                                        color = Color(0xFF94A3B8),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "${homeFilteredSchedules.size} Active Rules",
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = { showAddScheduleSheet = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = VoltaBlue),
+                                shape = RoundedCornerShape(99.dp),
+                                modifier = Modifier.testTag("add_schedule_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("New Rule", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Daily Schedules",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "Clock time & NOAA solar automation",
+                                fontSize = 11.sp,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
-                            Button(
-                                onClick = { showAddScheduleSheet = true },
-                                modifier = Modifier.testTag("add_schedule_button")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(99.dp),
+                                color = Color(0x1F22C55E),
+                                border = BorderStroke(1.dp, Color(0x4D22C55E))
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("New Schedule")
+                                Text(
+                                    text = "⚡ Daemon Sync",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VoltaGreen,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Automate per-outlet or master switching on chosen days with clock time or sunrise/sunset triggers.",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
@@ -377,40 +462,118 @@ fun SchedulesScreen(
                 }
             }
         } else {
-            // ==================== OUTLET TIMERS ====================
+            // ==================== OUTLET TIMERS HERO ====================
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = CardDefaults.outlinedCardBorder()
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF131C31)),
+                    border = BorderStroke(1.dp, Color(0x3338BDF8))
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                                )
+                            )
+                            .padding(16.dp)
+                    ) {
+                        // Title + Count + Add Button Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(Color(0x2638BDF8), CircleShape)
+                                        .border(1.5.dp, VoltaCyan.copy(alpha = 0.5f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Timer,
+                                        contentDescription = null,
+                                        tint = VoltaCyan,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                Column {
+                                    Text(
+                                        text = "OUTLET TIMERS",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.8.sp,
+                                        color = Color(0xFF94A3B8),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (homeFilteredTimers.isEmpty()) "0 Configured" else "${homeFilteredTimers.size} Configured (${homeFilteredTimers.count { it.isRunning && !it.isPaused }} Active)",
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+
+                            Button(
+                                onClick = { showAddTimerSheet = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = VoltaBlue),
+                                shape = RoundedCornerShape(99.dp),
+                                modifier = Modifier.testTag("add_timer_button")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("New Timer", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = Color(0x1FFFFFFF), thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Outlet Timers",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
+                                text = "Autonomous countdown auto-off & cyclic loops",
+                                fontSize = 11.5.sp,
+                                color = Color(0xFF94A3B8),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
-                            Button(
-                                onClick = { showAddTimerSheet = true },
-                                modifier = Modifier.testTag("add_timer_button")
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(99.dp),
+                                color = Color(0x1F22C55E),
+                                border = BorderStroke(1.dp, Color(0x4D22C55E))
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Add", modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("New Timer")
+                                Text(
+                                    text = "⏱️ Server Accurate",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = VoltaGreen,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Set countdowns to turn ON/OFF or recurring cyclic loops (alternate ON/OFF forever or for N times).",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }

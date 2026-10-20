@@ -763,7 +763,7 @@ fun StripInventoryCard(
                     modifier = Modifier.clickable { onRequestGuardConfig() }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -771,15 +771,17 @@ fun StripInventoryCard(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
                             tint = if (guardTripped) VoltaRed else if (guardEnabled) VoltaCyan else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(12.dp)
+                            modifier = Modifier.size(11.dp)
                         )
                         Text(
                             text = if (guardTripped) "Guard TRIPPED"
                                    else if (guardEnabled) "Guard Armed"
                                    else "Guard Off",
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (guardTripped) VoltaRed else if (guardEnabled) VoltaCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (guardTripped) VoltaRed else if (guardEnabled) VoltaCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
