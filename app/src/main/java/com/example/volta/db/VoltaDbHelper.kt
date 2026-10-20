@@ -106,10 +106,26 @@ class VoltaDbHelper(private val context: Context) : SQLiteOpenHelper(context, DA
 
     override fun onOpen(db: SQLiteDatabase) {
         super.onOpen(db)
-        createTimersTable(db)
-        try {
-            db.execSQL("ALTER TABLE strips ADD COLUMN home_id TEXT")
-        } catch (_: Exception) {}
+        if (!db.isReadOnly) {
+            createTimersTable(db)
+            if (!hasColumn(db, "strips", "home_id")) {
+                db.execSQL("ALTER TABLE strips ADD COLUMN home_id TEXT")
+            }
+        }
+    }
+
+    private fun hasColumn(db: SQLiteDatabase, tableName: String, columnName: String): Boolean {
+        db.rawQuery("PRAGMA table_info($tableName)", null).use { cursor ->
+            val nameIdx = cursor.getColumnIndex("name")
+            if (nameIdx >= 0) {
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(nameIdx).equals(columnName, ignoreCase = true)) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     private fun createTimersTable(db: SQLiteDatabase) {

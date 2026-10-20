@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Background with smooth rounded squircle -->
+    <path
+        android:pathData="M128,0 L384,0 A128,128 0 0,1 512,128 L512,384 A128,128 0 0,1 384,512 L128,512 A128,128 0 0,1 0,384 L0,128 A128,128 0 0,1 128,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="512"
+                android:endY="512"
+                android:type="linear">
+                <item android:color="#FF0B132B" android:offset="0.0" />
+                <item android:color="#FF0F172A" android:offset="0.6" />
+                <item android:color="#FF1E293B" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle inner border -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#4D38BDF8"
+        android:strokeWidth="4"
+        android:pathData="M128,4 L384,4 A124,124 0 0,1 508,128 L508,384 A124,124 0 0,1 384,508 L128,508 A124,124 0 0,1 4,384 L4,128 A124,124 0 0,1 128,4 Z" />
+
+    <!-- Glowing Power Emblem: Outer Ring with Top Opening -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="36"
+        android:strokeLineCap="round"
+        android:pathData="M 256,120 A 136,136 0 1,0 352.17,160.17">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="512"
+                android:endY="512"
+                android:type="linear">
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF0EA5E9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Glowing Power Emblem: Central Vertical Switch Blade -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeWidth="36"
+        android:strokeLineCap="round"
+        android:pathData="M 256,76 L 256,236">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="512"
+                android:endY="512"
+                android:type="linear">
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF0EA5E9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
