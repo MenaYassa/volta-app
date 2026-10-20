@@ -1,16 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <group
-        android:translateX="21.0"
-        android:translateY="21.0"
-        android:scaleX="0.1289"
-        android:scaleY="0.1289">
-        <path
-            android:fillColor="#FACC15"
-            android:pathData="M292,56 L132,300 L228,300 L212,456 L372,212 L276,212 Z" />
-    </group>
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Glowing Power Emblem Scaled to Adaptive Launcher Foreground Viewport -->
+    <!-- Outer Ring with Top Opening -->
+    <path
+        android:strokeWidth="38"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M 256,120 A 136,136 0 1,0 352.17,160.17">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="512"
+                android:endY="512"
+                android:type="linear">
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF0EA5E9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Central Vertical Switch Blade -->
+    <path
+        android:strokeWidth="38"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M 256,76 L 256,236">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="512"
+                android:endY="512"
+                android:type="linear">
+                <item android:color="#FF38BDF8" android:offset="0.0" />
+                <item android:color="#FF0EA5E9" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 </vector>

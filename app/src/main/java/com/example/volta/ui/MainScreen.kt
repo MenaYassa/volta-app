@@ -146,20 +146,11 @@ fun MainScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .background(Color(0x2638BDF8), CircleShape)
-                                        .border(1.5.dp, VoltaCyan.copy(alpha = 0.6f), CircleShape),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.PowerSettingsNew,
-                                        contentDescription = null,
-                                        tint = VoltaCyan,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_volta_logo),
+                                    contentDescription = "Volta",
+                                    modifier = Modifier.size(34.dp)
+                                )
 
                                 Column {
                                     Row(

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Timeline
@@ -450,16 +451,11 @@ fun AnalyticsScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        // Lightning badge
-                                        Box(
-                                            modifier = Modifier
-                                                .size(48.dp)
-                                                .background(Color(0x333B82F6), RoundedCornerShape(12.dp))
-                                                .border(1.dp, Color(0x4D3B82F6), RoundedCornerShape(12.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(text = "⚡", fontSize = 24.sp)
-                                        }
+                                        androidx.compose.foundation.Image(
+                                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_volta_logo),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(44.dp)
+                                        )
 
                                         Column {
                                             Text(
@@ -542,15 +538,11 @@ fun AnalyticsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                                         modifier = Modifier.weight(1f)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(54.dp)
-                                                .background(Color(0x333B82F6), RoundedCornerShape(14.dp))
-                                                .border(1.dp, Color(0x4D3B82F6), RoundedCornerShape(14.dp)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(text = "⚡", fontSize = 28.sp)
-                                        }
+                                        androidx.compose.foundation.Image(
+                                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_volta_logo),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(50.dp)
+                                        )
 
                                         Column {
                                             Text(
