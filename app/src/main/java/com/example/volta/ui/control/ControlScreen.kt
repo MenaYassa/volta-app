@@ -31,7 +31,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
@@ -139,10 +138,8 @@ fun ControlScreen(
     modifier: Modifier = Modifier
 ) {
     val strips by viewModel.strips.collectAsState()
-    val timers by viewModel.timers.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val authRequired by viewModel.authRequired.collectAsState()
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
     val homes by viewModel.homes.collectAsState()
     val selectedHomeId by viewModel.selectedHomeId.collectAsState()
 
