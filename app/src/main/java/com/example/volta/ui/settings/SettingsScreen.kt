@@ -960,6 +960,8 @@ fun SettingsScreen(
                         isStandalone = isStandalone,
                         costPerKwh = costPerKwh.toDoubleOrNull() ?: 2.18,
                         currency = currency.ifBlank { "EGP" },
+                        tariffMode = settings.tariffMode,
+                        tariffTiers = settings.tariffTiers,
                         ntfyTopic = "",
                         alertOfflineMin = alertOfflineMin.toIntOrNull() ?: 10,
                         notifyOffline = notifyOffline,

@@ -218,6 +218,33 @@ class VoltaViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun cycleOutlet(mac: String, outlet: Int, durationSeconds: Int = 20, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            val res = repository.cycleOutlet(mac, outlet, durationSeconds)
+            onResult?.invoke(res.isSuccess)
+        }
+    }
+
+    fun setBatchChildLock(mac: String, lockAll: Boolean) {
+        viewModelScope.launch {
+            repository.setBatchChildLock(mac, lockAll)
+        }
+    }
+
+    fun fetchSmartRules(mac: String, onResult: (Map<Int, com.example.volta.model.SmartRule>) -> Unit) {
+        viewModelScope.launch {
+            val res = repository.fetchSmartRules(mac)
+            onResult(res.getOrDefault(emptyMap()))
+        }
+    }
+
+    fun saveSmartRule(mac: String, rule: com.example.volta.model.SmartRule, onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            val res = repository.saveSmartRule(mac, rule)
+            onResult?.invoke(res.isSuccess)
+        }
+    }
+
     fun fetchGoogleClientId(onResult: (String) -> Unit) {
         viewModelScope.launch {
             val cid = repository.fetchGoogleClientId()

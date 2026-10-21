@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -600,6 +601,38 @@ fun StripShortcutSheet(
                                 fontSize = 11.5.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+
+                            // Batch Lock & Unlock Controls
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        strip.outlets.forEach { if (!it.locked) onToggleOutletLock(it.n) }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = VoltaAmber),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Black)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Lock All", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        strip.outlets.forEach { if (it.locked) onToggleOutletLock(it.n) }
+                                    },
+                                    border = BorderStroke(1.dp, VoltaSlateBorder),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.LockOpen, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Unlock All", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
 
                             // Per-outlet lock toggle rows
                             var localLockedOutlets by remember(strip.mac, strip.outlets) {

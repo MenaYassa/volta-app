@@ -217,10 +217,33 @@ class VoltaApiClient {
                                     }
                                 }
 
+                                val activeCyclesObj = sObj.optJSONObject("active_cycles")
+                                val activeCyclesMap = mutableMapOf<Int, com.example.volta.model.ActiveCycleInfo>()
+                                if (activeCyclesObj != null) {
+                                    val itKeys = activeCyclesObj.keys()
+                                    while (itKeys.hasNext()) {
+                                        val cKey = itKeys.next()
+                                        val cObj = activeCyclesObj.optJSONObject(cKey)
+                                        if (cObj != null) {
+                                            val cOutlet = cObj.optInt("outlet", cKey.toIntOrNull() ?: 0)
+                                            val cInfo = com.example.volta.model.ActiveCycleInfo(
+                                                mac = cObj.optString("mac", mac),
+                                                outlet = cOutlet,
+                                                duration = cObj.optInt("duration", 20),
+                                                remaining = cObj.optInt("remaining", 0),
+                                                expiresAt = cObj.optDouble("expires_at", 0.0)
+                                            )
+                                            activeCyclesMap[cOutlet] = cInfo
+                                        }
+                                    }
+                                }
+
                                 val overloadOk = oObj.optBoolean("overload_ok", true)
                                 val overheatOk = oObj.optBoolean("overheat_ok", true)
                                 val eventCode = oObj.optString("event_code", "00")
                                 val eventDesc = oObj.optString("event_desc", if (eventCode == "00") "Normal / OK" else "Event $eventCode")
+                                val activeCycle = activeCyclesMap[n]
+
                                 outletsList.add(
                                     Outlet(
                                         n = n,
@@ -234,7 +257,8 @@ class VoltaApiClient {
                                         overloadOk = overloadOk,
                                         overheatOk = overheatOk,
                                         eventCode = eventCode,
-                                        eventDesc = eventDesc
+                                        eventDesc = eventDesc,
+                                        activeCycle = activeCycle
                                     )
                                 )
                             }
@@ -249,6 +273,27 @@ class VoltaApiClient {
                             val guardObj = sObj.optJSONObject("voltage_guard")
                             val voltageGuard = if (guardObj != null) parseVoltageGuard(guardObj) else null
                             val lastSeenAgoStr = sObj.optString("last_seen_ago", "")
+
+                            val activeCyclesObj = sObj.optJSONObject("active_cycles")
+                            val activeCyclesMap = mutableMapOf<Int, com.example.volta.model.ActiveCycleInfo>()
+                            if (activeCyclesObj != null) {
+                                val itKeys = activeCyclesObj.keys()
+                                while (itKeys.hasNext()) {
+                                    val cKey = itKeys.next()
+                                    val cObj = activeCyclesObj.optJSONObject(cKey)
+                                    if (cObj != null) {
+                                        val cOutlet = cObj.optInt("outlet", cKey.toIntOrNull() ?: 0)
+                                        activeCyclesMap[cOutlet] = com.example.volta.model.ActiveCycleInfo(
+                                            mac = cObj.optString("mac", mac),
+                                            outlet = cOutlet,
+                                            duration = cObj.optInt("duration", 20),
+                                            remaining = cObj.optInt("remaining", 0),
+                                            expiresAt = cObj.optDouble("expires_at", 0.0)
+                                        )
+                                    }
+                                }
+                            }
+
                             list.add(
                                 PowerStrip(
                                     mac = mac,
@@ -265,7 +310,8 @@ class VoltaApiClient {
                                     serverCurrentA = serverCurrentA,
                                     voltageGuard = voltageGuard,
                                     lastSeenAgoServer = lastSeenAgoStr,
-                                    homeId = sObj.optString("home_id").takeIf { it.isNotBlank() } ?: sObj.optString("homeId").takeIf { it.isNotBlank() }
+                                    homeId = sObj.optString("home_id").takeIf { it.isNotBlank() } ?: sObj.optString("homeId").takeIf { it.isNotBlank() },
+                                    activeCycles = activeCyclesMap
                                 )
                             )
                     }
@@ -417,6 +463,24 @@ class VoltaApiClient {
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
             val cleanMac = mac.replace(":", "").uppercase()
+
+            // 1. Primary: Use dedicated /api/child-lock endpoint
+            val childLockUrl = "${baseUrl.trimEnd('/')}/api/child-lock"
+            val childPayload = JSONObject().apply {
+                put("mac", cleanMac)
+                put("outlet", outlet)
+                if (locked != null) put("locked", locked)
+            }
+            val req1 = Request.Builder().url(childLockUrl).post(childPayload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(req1, token)
+            val resp1 = client.newCall(req1.build()).execute()
+            if (resp1.isSuccessful) {
+                resp1.close()
+                return@withContext Result.success(true)
+            }
+            resp1.close()
+
+            // 2. Fallback: /api/outlet/lock
             val url = "${baseUrl.trimEnd('/')}/api/outlet/lock"
             val payload = JSONObject().apply {
                 put("mac", cleanMac)
@@ -457,6 +521,62 @@ class VoltaApiClient {
                 fbResp.close()
             }
             Result.failure(Exception(if (code == 409) "Outlet is locked against switching" else "HTTP $code: $body"))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun setBatchChildLock(
+        baseUrl: String,
+        token: String,
+        mac: String,
+        action: String // "lock_all" or "unlock_all"
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val cleanMac = mac.replace(":", "").uppercase()
+            val url = "${baseUrl.trimEnd('/')}/api/child-lock"
+            val payload = JSONObject().apply {
+                put("mac", cleanMac)
+                put("action", action)
+            }
+            val req = Request.Builder().url(url).post(payload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(req, token)
+            client.newCall(req.build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun cycleOutlet(
+        baseUrl: String,
+        token: String,
+        mac: String,
+        outlet: Int,
+        durationSeconds: Int = 20
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val cleanMac = mac.replace(":", "").uppercase()
+            val url = "${baseUrl.trimEnd('/')}/api/cycle"
+            val payload = JSONObject().apply {
+                put("mac", cleanMac)
+                put("outlet", outlet)
+                put("duration_seconds", durationSeconds.coerceIn(5, 900))
+            }
+            val req = Request.Builder().url(url).post(payload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(req, token)
+            client.newCall(req.build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    Result.success(true)
+                } else {
+                    Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -1170,6 +1290,7 @@ class VoltaApiClient {
                 val estCost = summaryObj.optDouble("estimated_cost", summaryObj.optDouble("cost", 0.0))
                 val costPerKwh = json.optDouble("cost_per_kwh", summaryObj.optDouble("cost_per_kwh", 2.18))
                 val currency = json.optString("currency", summaryObj.optString("currency", "EGP"))
+                val tariffMode = summaryObj.optString("tariff_mode", json.optString("tariff_mode", "flat"))
 
                 val summary = AnalyticsSummary(
                     energyKwh = totalKwh,
@@ -1184,7 +1305,8 @@ class VoltaApiClient {
                     stripsCount = summaryObj.optInt("strips_count", 1),
                     cost = estCost,
                     currency = currency,
-                    costPerKwh = costPerKwh
+                    costPerKwh = costPerKwh,
+                    tariffMode = tariffMode
                 )
                 Result.success(summary)
             }
@@ -1827,6 +1949,76 @@ class VoltaApiClient {
                 .post(payload.toString().toRequestBody(jsonMediaType))
             addAuthHeaders(reqBuilder, token)
             client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.isSuccessful) Result.success(true)
+                else Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchSmartRules(baseUrl: String, token: String, mac: String): Result<Map<Int, com.example.volta.model.SmartRule>> = withContext(Dispatchers.IO) {
+        try {
+            val cleanMac = mac.replace(":", "").uppercase()
+            val url = "${baseUrl.trimEnd('/')}/api/smart-rules?mac=$cleanMac"
+            val req = Request.Builder().url(url).get()
+            addAuthHeaders(req, token)
+            client.newCall(req.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    return@withContext Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
+                }
+                val body = resp.body?.string().orEmpty()
+                val json = JSONObject(body)
+                val rulesObj = json.optJSONObject("rules") ?: JSONObject()
+                val map = mutableMapOf<Int, com.example.volta.model.SmartRule>()
+                val keys = rulesObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val r = rulesObj.optJSONObject(k)
+                    if (r != null) {
+                        val outlet = k.toIntOrNull() ?: 1
+                        map[outlet] = com.example.volta.model.SmartRule(
+                            outlet = outlet,
+                            enabled = r.optBoolean("enabled", true),
+                            chargeArmW = r.optDouble("charge_arm_w", 15.0),
+                            chargeCompW = r.optDouble("charge_comp_w", 3.0),
+                            chargeHoldSec = r.optInt("charge_hold_sec", 60),
+                            idleW = r.optDouble("idle_w", 5.0),
+                            idleHoldSec = r.optInt("idle_hold_sec", 120),
+                            maxW = r.optDouble("max_w", 2000.0)
+                        )
+                    }
+                }
+                Result.success(map)
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveSmartRule(
+        baseUrl: String,
+        token: String,
+        mac: String,
+        rule: com.example.volta.model.SmartRule
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val cleanMac = mac.replace(":", "").uppercase()
+            val url = "${baseUrl.trimEnd('/')}/api/smart-rules"
+            val payload = JSONObject().apply {
+                put("mac", cleanMac)
+                put("outlet", rule.outlet)
+                put("enabled", rule.enabled)
+                put("charge_arm_w", rule.chargeArmW)
+                put("charge_comp_w", rule.chargeCompW)
+                put("charge_hold_sec", rule.chargeHoldSec)
+                put("idle_w", rule.idleW)
+                put("idle_hold_sec", rule.idleHoldSec)
+                put("max_w", rule.maxW)
+            }
+            val req = Request.Builder().url(url).post(payload.toString().toRequestBody(jsonMediaType))
+            addAuthHeaders(req, token)
+            client.newCall(req.build()).execute().use { resp ->
                 if (resp.isSuccessful) Result.success(true)
                 else Result.failure(Exception("HTTP ${resp.code}: ${resp.message}"))
             }

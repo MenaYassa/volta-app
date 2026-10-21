@@ -623,6 +623,64 @@ class VoltaRepository(private val context: Context) {
         }
     }
 
+    suspend fun setBatchChildLock(mac: String, lockAll: Boolean) = withContext(Dispatchers.IO) {
+        val action = if (lockAll) "lock_all" else "unlock_all"
+        for (n in 1..4) {
+            dbHelper.updateOutletLock(mac, n, lockAll)
+        }
+        _strips.value = _strips.value.map { s ->
+            if (s.mac == mac) {
+                s.copy(outlets = s.outlets.map { it.copy(locked = lockAll) })
+            } else s
+        }
+        addLog("SYS", mac, "All outlets ${if (lockAll) "LOCKED" else "UNLOCKED"}")
+
+        val s = _settings.value
+        if (!s.isStandalone && s.serverToken.isNotBlank() && s.serverUrl.isNotBlank()) {
+            apiClient.setBatchChildLock(s.serverUrl, s.serverToken, mac, action)
+        }
+    }
+
+    suspend fun cycleOutlet(mac: String, outlet: Int, durationSeconds: Int = 20): Result<Boolean> = withContext(Dispatchers.IO) {
+        val s = _settings.value
+        addLog("SYS", mac, "Initiating pulse power cycle on outlet $outlet (${durationSeconds}s)...")
+        if (!s.isStandalone && s.serverToken.isNotBlank() && s.serverUrl.isNotBlank()) {
+            val res = apiClient.cycleOutlet(s.serverUrl, s.serverToken, mac, outlet, durationSeconds)
+            if (res.isSuccess) {
+                addLog("SYS", mac, "✓ Power cycle ($durationSeconds s) scheduled on server for outlet $outlet")
+                pollRemoteServer()
+            }
+            res
+        } else {
+            // Local fallback
+            toggleOutlet(mac, outlet, false)
+            repoScope.launch {
+                delay(durationSeconds * 1000L)
+                toggleOutlet(mac, outlet, true)
+            }
+            Result.success(true)
+        }
+    }
+
+    suspend fun fetchSmartRules(mac: String): Result<Map<Int, com.example.volta.model.SmartRule>> = withContext(Dispatchers.IO) {
+        val s = _settings.value
+        if (!s.isStandalone && s.serverToken.isNotBlank() && s.serverUrl.isNotBlank()) {
+            apiClient.fetchSmartRules(s.serverUrl, s.serverToken, mac)
+        } else {
+            Result.success(emptyMap())
+        }
+    }
+
+    suspend fun saveSmartRule(mac: String, rule: com.example.volta.model.SmartRule): Result<Boolean> = withContext(Dispatchers.IO) {
+        val s = _settings.value
+        addLog("SYS", mac, "Updating Smart Rules for outlet ${rule.outlet}")
+        if (!s.isStandalone && s.serverToken.isNotBlank() && s.serverUrl.isNotBlank()) {
+            apiClient.saveSmartRule(s.serverUrl, s.serverToken, mac, rule)
+        } else {
+            Result.success(true)
+        }
+    }
+
     suspend fun addStrip(mac: String, name: String, ip: String) = withContext(Dispatchers.IO) {
         val cleanedMac = mac.replace(":", "").uppercase()
         val s = _settings.value

@@ -2,6 +2,14 @@ package com.example.volta.model
 
 import java.util.Locale
 
+data class ActiveCycleInfo(
+    val mac: String,
+    val outlet: Int,
+    val duration: Int,
+    val remaining: Int,
+    val expiresAt: Double
+)
+
 data class Outlet(
     val n: Int,
     val name: String = "Outlet $n",
@@ -15,7 +23,8 @@ data class Outlet(
     val overloadOk: Boolean = true,
     val overheatOk: Boolean = true,
     val eventCode: String = "00",
-    val eventDesc: String = "Normal / OK"
+    val eventDesc: String = "Normal / OK",
+    val activeCycle: ActiveCycleInfo? = null
 )
 
 data class VoltaHome(
@@ -50,7 +59,8 @@ data class PowerStrip(
     val voltageGuard: VoltageGuard? = null,
     val lastSeenAgoServer: String = "",
     val isConnectingCloud: Boolean = false,
-    val homeId: String? = null
+    val homeId: String? = null,
+    val activeCycles: Map<Int, ActiveCycleInfo> = emptyMap()
 ) {
     val guard: VoltageGuard
         get() = voltageGuard ?: VoltageGuard()
@@ -175,6 +185,22 @@ data class TopConsumer(
     val peakPowerW: Double = 0.0
 )
 
+data class SmartRule(
+    val outlet: Int,
+    val enabled: Boolean = true,
+    val chargeArmW: Double = 15.0,
+    val chargeCompW: Double = 3.0,
+    val chargeHoldSec: Int = 60,
+    val idleW: Double = 5.0,
+    val idleHoldSec: Int = 120,
+    val maxW: Double = 2000.0
+)
+
+data class TariffTier(
+    val maxKwh: Double,
+    val rate: Double
+)
+
 data class AnalyticsSummary(
     val energyKwh: Double,
     val wattHours: Double,
@@ -188,7 +214,8 @@ data class AnalyticsSummary(
     val stripsCount: Int = 1,
     val cost: Double = 0.0,
     val currency: String = "EGP",
-    val costPerKwh: Double = 2.18
+    val costPerKwh: Double = 2.18,
+    val tariffMode: String = "flat"
 )
 
 data class VoltaSettings(
@@ -197,6 +224,8 @@ data class VoltaSettings(
     val isStandalone: Boolean = false,
     val costPerKwh: Double = 2.18,
     val currency: String = "EGP",
+    val tariffMode: String = "flat",
+    val tariffTiers: List<TariffTier> = emptyList(),
     val ntfyTopic: String = "",
     val alertOfflineMin: Int = 10,
     val notifyOffline: Boolean = true,

@@ -162,6 +162,8 @@ fun ControlScreen(
     var renameDialogTarget by remember { mutableStateOf<Pair<String, Outlet>?>(null) }
     var renameStripTarget by remember { mutableStateOf<PowerStrip?>(null) }
     var rebootConfirmTarget by remember { mutableStateOf<PowerStrip?>(null) }
+    var cycleConfirmTarget by remember { mutableStateOf<Triple<String, String, Int>?>(null) } // mac, stripName, outlet
+    var smartRulesTarget by remember { mutableStateOf<Triple<String, String, Int>?>(null) } // mac, stripName, outlet
     var timerSheetTarget by remember { mutableStateOf<Pair<String, Int>?>(null) }
     var guardSheetMac by remember { mutableStateOf<String?>(null) }
     var shortcutSheetMac by remember { mutableStateOf<String?>(null) }
@@ -317,6 +319,34 @@ fun ControlScreen(
                 }
             },
             containerColor = VoltaSlateCard
+        )
+    }
+
+    // Pulse Power Cycle Confirmation Dialog
+    if (cycleConfirmTarget != null) {
+        val target = cycleConfirmTarget!!
+        com.example.volta.ui.components.CycleConfirmationDialog(
+            stripName = target.second,
+            outletName = "Outlet ${target.third}",
+            onConfirm = { durationSec ->
+                viewModel.cycleOutlet(target.first, target.third, durationSec)
+                cycleConfirmTarget = null
+            },
+            onDismiss = { cycleConfirmTarget = null }
+        )
+    }
+
+    // Per-Outlet Smart Rules Sheet
+    if (smartRulesTarget != null) {
+        val target = smartRulesTarget!!
+        com.example.volta.ui.components.SmartRulesSheet(
+            stripName = target.second,
+            outletNumber = target.third,
+            initialRule = null,
+            onSave = { rule ->
+                viewModel.saveSmartRule(target.first, rule)
+            },
+            onDismiss = { smartRulesTarget = null }
         )
     }
 

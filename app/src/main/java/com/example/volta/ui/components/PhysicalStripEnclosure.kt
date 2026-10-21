@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.volta.model.PowerStrip
+import androidx.compose.material.icons.filled.RestartAlt
+import com.example.volta.theme.VoltaCyan
 import com.example.volta.theme.VoltaAmber
 import com.example.volta.theme.VoltaGreen
 import com.example.volta.theme.VoltaGreenBright
@@ -333,15 +335,23 @@ fun PhysicalStripEnclosure(
                                 .padding(horizontal = 4.dp)
                         ) {
                             Box(contentAlignment = Alignment.TopEnd) {
+                                val isCycling = outlet.activeCycle != null
+                                val cycleRemaining = outlet.activeCycle?.remaining ?: 0
+
                                 // Circular Grounded Socket Receptacle with generous touch target
                                 Box(
                                     modifier = Modifier
                                         .size(42.dp)
-                                        .shadow(elevation = if (isOn) 5.dp else 1.dp, shape = CircleShape)
-                                        .background(socketBg, CircleShape)
-                                        .border(1.8.dp, socketBorder, CircleShape)
+                                        .shadow(elevation = if (isOn || isCycling) 5.dp else 1.dp, shape = CircleShape)
+                                        .then(
+                                            if (isCycling) Modifier.background(Color(0x3338BDF8), CircleShape)
+                                            else Modifier.background(socketBg, CircleShape)
+                                        )
+                                        .border(1.8.dp, if (isCycling) VoltaCyan else socketBorder, CircleShape)
                                         .clickable {
-                                            if (isLocked) {
+                                            if (isCycling) {
+                                                // Cycle in progress
+                                            } else if (isLocked) {
                                                 onLockedOutletClick(outlet.n)
                                             } else {
                                                 onToggleOutlet(outlet.n, !isOn)
@@ -351,9 +361,9 @@ fun PhysicalStripEnclosure(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Bolt,
+                                        imageVector = if (isCycling) Icons.Default.RestartAlt else Icons.Default.Bolt,
                                         contentDescription = "Outlet ${outlet.n}",
-                                        tint = boltColor,
+                                        tint = if (isCycling) VoltaCyan else boltColor,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -379,12 +389,14 @@ fun PhysicalStripEnclosure(
                             }
 
                             Spacer(modifier = Modifier.height(4.dp))
+                            val isCycling = outlet.activeCycle != null
+                            val cycleRemaining = outlet.activeCycle?.remaining ?: 0
                             val displayName = outlet.name.ifBlank { "Outlet ${outlet.n}" }
                             Text(
                                 text = if (isLocked) "$displayName 🔒" else displayName,
                                 fontSize = 9.5.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (isOn) Color.White else Color(0xFF94A3B8),
+                                color = if (isOn || isCycling) Color.White else Color(0xFF94A3B8),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 textAlign = TextAlign.Center
@@ -392,11 +404,20 @@ fun PhysicalStripEnclosure(
 
                             // Live Power or Status
                             Text(
-                                text = if (isOn) "${String.format(Locale.US, "%.0f", outlet.powerW)}W" else "OFF",
+                                text = when {
+                                    isCycling -> "CYCLE (${cycleRemaining}s)"
+                                    isOn -> "${String.format(Locale.US, "%.0f", outlet.powerW)}W"
+                                    else -> "OFF"
+                                },
                                 fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isOn) VoltaGreenBright else Color(0xFF64748B),
-                                maxLines = 1
+                                fontWeight = if (isOn || isCycling) FontWeight.Bold else FontWeight.Normal,
+                                color = when {
+                                    isCycling -> VoltaCyan
+                                    isOn -> VoltaGreenBright
+                                    else -> Color(0xFF64748B)
+                                },
+                                maxLines = 1,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
