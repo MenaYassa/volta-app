@@ -62,7 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.R
+import com.plug.volta.R
 import com.example.volta.model.GoogleAuthConfig
 import com.example.volta.theme.VoltaBlue
 import com.example.volta.theme.VoltaGreen

@@ -58,7 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
+import com.plug.volta.R
 import com.example.volta.theme.VoltaBlue
 import com.example.volta.theme.VoltaGreen
 import com.example.volta.theme.VoltaYellow

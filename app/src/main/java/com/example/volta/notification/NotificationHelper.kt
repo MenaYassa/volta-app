@@ -12,7 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.volta.MainActivity
-import com.example.R
+import com.plug.volta.R
 
 class NotificationHelper(private val context: Context) {
 

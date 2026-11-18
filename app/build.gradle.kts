@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example"
+    namespace = "com.plug.volta"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aistudio.volta.kxwz"
+        applicationId = "com.plug.volta"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

@@ -74,7 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
+import com.plug.volta.R
 import com.example.volta.model.GoogleAuthConfig
 import com.example.volta.model.WhoAmIResponse
 import com.example.volta.theme.VoltaAmber

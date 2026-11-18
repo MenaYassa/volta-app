@@ -452,7 +452,7 @@ fun AnalyticsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         androidx.compose.foundation.Image(
-                                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_volta_logo),
+                                            painter = androidx.compose.ui.res.painterResource(id = com.plug.volta.R.drawable.ic_volta_logo),
                                             contentDescription = null,
                                             modifier = Modifier.size(44.dp)
                                         )
@@ -539,7 +539,7 @@ fun AnalyticsScreen(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         androidx.compose.foundation.Image(
-                                            painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_volta_logo),
+                                            painter = androidx.compose.ui.res.painterResource(id = com.plug.volta.R.drawable.ic_volta_logo),
                                             contentDescription = null,
                                             modifier = Modifier.size(50.dp)
                                         )

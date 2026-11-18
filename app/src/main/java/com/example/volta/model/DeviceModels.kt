@@ -298,7 +298,7 @@ object GoogleAuthConfig {
     const val PROJECT_ID = "volta-510610"
     const val CLIENT_SECRET = ""
     const val REDIRECT_URI = "https://volta.03092017.xyz"
-    const val PACKAGE_NAME = "com.aistudio.volta.kxwz"
+    const val PACKAGE_NAME = "com.plug.volta"
     const val SHA1_FINGERPRINT = "90:8E:F0:0C:3E:8D:10:65:0E:2F:12:7E:EE:5D:22:08:88:3D:18:79"
 
     fun getGoogleOAuthUrl(nonce: String = "volta_${System.currentTimeMillis()}"): String {

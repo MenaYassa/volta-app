@@ -147,7 +147,7 @@ fun MainScreen(
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
                                 androidx.compose.foundation.Image(
-                                    painter = androidx.compose.ui.res.painterResource(id = com.example.R.drawable.ic_volta_logo),
+                                    painter = androidx.compose.ui.res.painterResource(id = com.plug.volta.R.drawable.ic_volta_logo),
                                     contentDescription = "Volta",
                                     modifier = Modifier.size(34.dp)
                                 )
