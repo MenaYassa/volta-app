@@ -24,7 +24,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Volta">
         <activity
-            android:name="com.example.volta.MainActivity"
+            android:name="com.plug.volta.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.Volta"
             android:windowSoftInputMode="adjustResize">
